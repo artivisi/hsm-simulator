@@ -698,6 +698,323 @@ graph LR
 
 ---
 
+## 🎫 PIN Issuance Methods
+
+### PIN Selection dan Distribution Methods
+
+Dalam industri perbankan, ada beberapa metode untuk nasabah memilih dan menerima PIN mereka. HSM Simulator mensimulasikan proses ini untuk pembelajaran.
+
+### Method 1: PIN Pad/ATM First Time PIN Selection
+
+#### Proses PIN Selection via ATM
+```mermaid
+sequenceDiagram
+    participant C as Customer
+    participant A as ATM
+    participant S as Switch/Network
+    participant I as Issuer System
+    participant H as HSM
+    participant D as Database
+
+    Note over C,A: Step 1: Card Activation
+    C->>A: Insert new card
+    A->>A: Read card data
+    A->>C: Display "First time use"
+    A->>C: Prompt "Create new PIN"
+
+    Note over C,A: Step 2: PIN Entry
+    C->>A: Enter desired PIN (6 digits)
+    A->>A: Confirm PIN entry
+    C->>A: Re-enter PIN for confirmation
+    A->>A: Validate PIN match
+
+    Note over A,I: Step 3: PIN Block Generation
+    A->>A: Generate PIN Block (ISO-0)
+    A->>S: Send PIN Block + Card Data
+    S->>I: Forward to issuer
+    I->>H: Request PIN encryption
+    H->>H: Generate encrypted PIN block
+    H->>I: Return encrypted PIN block
+
+    Note over I,D: Step 4: Store PIN Block
+    I->>D: Store encrypted PIN block
+    D->>I: Confirmation
+    I->>S: Success response
+    S->>A: Success to ATM
+    A->>C: "PIN created successfully"
+
+    Note over C,A: Step 5: Activation Complete
+    A->>C: "Card is now active"
+    A->>C: "Remove card"
+```
+
+#### Detailed PIN Pad Selection Flow
+```mermaid
+graph TB
+    subgraph "Card Insertion & Recognition"
+        A[Customer inserts new card] --> B[ATM reads card data]
+        B --> C[Detect first-time use]
+        C --> D[Display activation screen]
+    end
+
+    subgraph "PIN Selection Process"
+        D --> E[Prompt: "Create new PIN"]
+        E --> F[Customer enters PIN]
+        F --> G[Validate PIN format]
+        G --> H{PIN valid?}
+        H -->|No| I[Show error message]
+        I --> E
+        H -->|Yes| J[Prompt: "Confirm PIN"]
+        J --> K[Customer re-enters PIN]
+        K --> L{PINs match?}
+        L -->|No| M[Show mismatch error]
+        M --> E
+        L -->|Yes| N[Proceed to storage]
+    end
+
+    subgraph "PIN Block Generation & Storage"
+        N --> O[ATM generates PIN block]
+        O --> P[Encrypt with terminal key]
+        P --> Q[Send to issuer system]
+        Q --> R[Store in database]
+        R --> S[Send confirmation]
+        S --> T[Activation complete]
+    end
+
+    style T fill:#e8f5e8
+    style I fill:#ffebee
+    style M fill:#ffebee
+```
+
+#### ATM PIN Selection Screen Flow
+```mermaid
+stateDiagram-v2
+    [*] --> CardInserted: Insert Card
+    CardInserted --> ReadCardData: Read Card
+    ReadCardData --> FirstTimeCheck: Check Status
+
+    FirstTimeCheck --> ExistingCard: Existing PIN
+    FirstTimeCheck --> NewCard: No PIN Set
+
+    ExistingCard --> NormalOperation: Enter PIN
+    NewCard --> CreatePIN: "Create New PIN"
+
+    CreatePIN --> EnterNewPIN: Enter PIN
+    EnterNewPIN --> ValidatePIN: Validate Format
+    ValidatePIN --> ConfirmPIN: "Confirm PIN"
+    ConfirmPIN --> VerifyMatch: Verify Match
+    VerifyMatch --> PINMatched: Match ✓
+    VerifyMatch --> PINMismatch: Mismatch ✗
+
+    PINMismatch --> CreatePIN: Try Again
+    PINMatched --> GeneratePINBlock: Generate PIN Block
+    GeneratePINBlock --> StorePIN: Store & Activate
+    StorePIN --> ActivationComplete: "Success!"
+
+    ActivationComplete --> [*]: Remove Card
+
+    NormalOperation --> [*]: Normal Transaction
+```
+
+### Method 2: PIN Mailer Distribution
+
+#### PIN Mailer Generation and Delivery Process
+```mermaid
+graph TB
+    subgraph "Batch Card Issuance"
+        A[Bank decides to issue new cards] --> B[Generate card data]
+        B --> C[Bulk card printing]
+        C --> D[Card personalization]
+    end
+
+    subgraph "PIN Generation & Security"
+        D --> E[HSM generates random PINs]
+        E --> F[Generate PIN blocks]
+        F --> G[Encrypt PIN blocks]
+        G --> H[Store PIN blocks in database]
+    end
+
+    subgraph "PIN Mailer Production"
+        E --> I[Prepare PIN data for printing]
+        I --> J[Secure printing facility]
+        J --> K[Print PIN mailers]
+        K --> L[Quality control]
+        L --> M[Secure packaging]
+    end
+
+    subgraph "Distribution Process"
+        M --> N[Secure logistics]
+        N --> O[Branch distribution]
+        O --> P[Customer handover]
+    end
+
+    subgraph "Customer Activation"
+        P --> Q[Customer receives card]
+        Q --> R[Customer receives PIN mailer]
+        R --> S[Separate delivery channels]
+        S --> T[Customer activates card]
+    end
+
+    style E fill:#e8f5e8
+    style J fill:#e3f2fd
+    style T fill:#fff3e0
+```
+
+#### PIN Mailer Security Features
+```mermaid
+graph LR
+    subgraph "Physical Security"
+        A[Tamper-evident envelope] --> B[Security printing]
+        B --> C[Unique serial numbers]
+        C --> D[Barcode/QR tracking]
+    end
+
+    subgraph "Data Security"
+        E[Encrypted PIN data] --> F[Secure transmission]
+        F --> G[Access controlled printing]
+        G --> H[Destruction of materials]
+    end
+
+    subgraph "Process Security"
+        I[Segregation of duties] --> J[Dual control]
+        J --> K[Audit trail]
+        K --> L[Time-stamped logs]
+    end
+
+    subgraph "Delivery Security"
+        M[Separate from cards] --> N[Secure courier]
+        N --> O[Signature required]
+        O --> P[Delivery confirmation]
+    end
+
+    style A fill:#e8f5e8
+    style E fill:#e3f2fd
+    style I fill:#fff3e0
+    style M fill:#f3e5f5
+```
+
+#### PIN Mailer Lifecycle
+```mermaid
+sequenceDiagram
+    participant BS as Banking System
+    participant HSM as HSM
+    participant PP as Print Provider
+    participant BC as Branch Courier
+    participant C as Customer
+
+    Note over BS,HSM: Step 1: PIN Generation
+    BS->>HSM: Generate 1000 random PINs
+    HSM->>BS: Return encrypted PINs
+    BS->>BS: Store in database
+
+    Note over BS,PP: Step 2: Mailer Production
+    BS->>PP: Send encrypted PIN data
+    PP->>PP: Secure print setup
+    PP->>PP: Print PIN mailers
+    PP->>PP: Quality verification
+
+    Note over PP,BC: Step 3: Secure Distribution
+    PP->>BC: Secure package transfer
+    BC->>BC: Verify package integrity
+    BC->>BC: Store in secure area
+
+    Note over BC,C: Step 4: Customer Handover
+    C->>BC: Present identification
+    BC->>BC: Verify customer identity
+    BC->>C: Issue sealed PIN mailer
+    C->>C: Open private location
+    C->>C: Memorize PIN
+    C->>C: Destroy mailer
+
+    Note over C: Step 5: First Use
+    C->>C: Use card + PIN at ATM
+```
+
+### Method 3: Instant PIN Issuance (Branch Banking)
+
+#### Branch Counter PIN Selection
+```mermaid
+graph TB
+    subgraph "Customer Visit"
+        A[Customer visits branch] --> B[Request new card]
+        B --> C[Present identification]
+        C --> D[Verification complete]
+    end
+
+    subgraph "PIN Selection at Counter"
+        D --> E[Teller offers PIN options]
+        E --> F[Customer chooses selection method]
+        F --> G{Selection Method}
+        G -->|Self-selected| H[Customer enters PIN on PIN pad]
+        G -->|System-generated| I[System generates random PIN]
+        G -->|Phone delivery| J[Secure SMS/call delivery]
+    end
+
+    subgraph "PIN Processing"
+        H --> K[Encrypt PIN immediately]
+        I --> K
+        J --> K
+        K --> L[Store in core banking]
+        L --> M[Issue card immediately]
+    end
+
+    subgraph "Customer Experience"
+        M --> N[Customer receives card]
+        N --> O[Customer knows PIN]
+        O --> P[Can use immediately]
+    end
+
+    style P fill:#e8f5e8
+```
+
+### Comparison of PIN Issuance Methods
+
+#### Method Comparison Table
+| Method | Security | Convenience | Customer Experience | Cost | Speed |
+|--------|----------|-------------|-------------------|------|-------|
+| **PIN Pad/ATM** | High | High | Self-service, instant | Low | Immediate |
+| **PIN Mailer** | Very High | Low | Wait for delivery | Medium | 3-7 days |
+| **Branch Issuance** | High | Medium | Face-to-face service | High | Same day |
+| **Phone Delivery** | Medium | High | Instant notification | Low | Immediate |
+| **Mobile App** | High | Very High | Digital experience | Low | Immediate |
+
+#### Security Considerations per Method
+```mermaid
+graph TB
+    subgraph "PIN Pad Method"
+        A[Security Advantages] --> B[PIN never in plaintext]
+        B --> C[Customer creates own PIN]
+        C --> D[Immediate encryption]
+        A --> E[Security Risks]
+        E --> F[Shoulder surfing]
+        F --> G[ATM tampering]
+    end
+
+    subgraph "PIN Mailer Method"
+        H[Security Advantages] --> I[Physical security features]
+        I --> J[Separation from card]
+        J --> K[No digital transmission]
+        H --> L[Security Risks]
+        L --> M[Postal interception]
+        M --> N[Customer doesn't destroy mailer]
+    end
+
+    subgraph "Branch Method"
+        O[Security Advantages] --> P[Identity verification]
+        P --> Q[Secure environment]
+        Q --> R[Immediate processing]
+        O --> S[Security Risks]
+        S --> T[Staff collusion]
+        T --> U[PIN pad tampering]
+    end
+
+    style A fill:#e8f5e8
+    style H fill:#e3f2fd
+    style O fill:#fff3e0
+```
+
+---
+
 ## 📖 Glossary
 
 ### Terms
