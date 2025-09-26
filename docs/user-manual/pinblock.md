@@ -1616,6 +1616,255 @@ sequenceDiagram
     C->>C: Use card + PIN at ATM
 ```
 
+### 1.4 PIN Mailer Activation Process
+
+Proses aktivasi PIN mailer adalah mekanisme penting untuk menghubungkan PIN yang dihasilkan secara acak dengan kartu yang diterima nasabah.
+
+#### Card-PIN Binding Process
+```mermaid
+graph TB
+    subgraph "Batch Card Production"
+        A[Generate 1000 card numbers] --> B[Generate 1000 random PINs]
+        B --> C[Create PIN blocks for each card]
+        C --> D[Store encrypted PIN blocks]
+        D --> E[Link card-PIN in database]
+    end
+
+    subgraph "Database Linking Mechanism"
+        E --> F[Cards Table]
+        F --> G[card_id, pan, status]
+
+        E --> H[PIN Blocks Table]
+        H --> I[pin_block_id, card_id, encrypted_pin]
+
+        F --> J[One-to-One Relationship]
+        J --> K[Each card has exactly one PIN]
+
+        subgraph "Linking Fields"
+            G --> L[Primary Key: card_id]
+            I --> L
+            L --> M[Foreign Key: card_id references cards.card_id]
+        end
+    end
+
+    subgraph "Physical Distribution"
+        E --> N[Card Production]
+        N --> O[Cards mailed to customers]
+
+        E --> P[PIN Mailer Production]
+        P --> Q[PIN mailers mailed separately]
+
+        O --> R[Customer receives card]
+        Q --> R
+        R --> S[Customer links card + PIN mentally]
+    end
+
+    style E fill:#e8f5e8
+    style J fill:#e3f2fd
+    style R fill:#fff3e0
+```
+
+#### Database Schema for Card-PIN Binding
+```mermaid
+erDiagram
+    CARDS ||--o{ PIN_BLOCKS : "card_id"
+    CARDS ||--|| CUSTOMERS : "customer_id"
+
+    CARDS {
+        string card_id PK
+        string customer_id FK
+        string pan "16-digit Primary Account Number"
+        string expiry_date
+        string card_status "Active/Inactive/Blocked"
+        datetime issue_date
+        string card_type "Debit/Credit"
+    }
+
+    PIN_BLOCKS {
+        string pin_block_id PK
+        string card_id FK "Links to specific card"
+        string encrypted_pin_block "AES-256 encrypted PIN data"
+        string encryption_key_id "Key used for encryption"
+        string format_type "ISO-0/1/2/3"
+        datetime creation_date
+        datetime activation_date
+        string status "Pending/Active/Expired"
+        string key_check_value "For verification"
+    }
+
+    CUSTOMERS {
+        string customer_id PK
+        string name
+        string identification_number
+        string contact_info
+        datetime registration_date
+    }
+```
+
+#### PIN Mailer Matching System
+```mermaid
+sequenceDiagram
+    participant SYS as Banking System
+    participant DB as Database
+    participant HSM as HSM
+    participant C as Customer
+    participant ATM as ATM Terminal
+
+    Note over SYS,DB: Step 1: Card-PIN Pair Generation
+    SYS->>SYS: Generate card number: 1234567890123456
+    SYS->>HSM: Generate random PIN: 7890
+    HSM->>HSM: Create PIN block: ABC123DEF456...
+    HSM->>SYS: Return encrypted PIN block
+    SYS->>DB: Store with card_id link
+
+    Note over SYS,C: Step 2: Physical Distribution
+    SYS->>SYS: Print card with PAN: 1234567890123456
+    SYS->>SYS: Print PIN mailer with PIN: 7890
+    SYS->>C: Mail card to customer address
+    SYS->>C: Mail PIN mailer separately
+
+    Note over C,ATM: Step 3: Customer Activation
+    C->>ATM: Insert card: 1234567890123456
+    ATM->>ATM: Read PAN from card
+    ATM->>C: Display "Enter PIN"
+    C->>ATM: Enter PIN: 7890 (from mailer)
+    ATM->>ATM: Generate PIN block with entered PIN
+    ATM->>SYS: Send transaction request
+
+    Note over SYS,DB: Step 4: System Verification
+    SYS->>DB: Find card_id for PAN: 1234567890123456
+    DB->>SYS: Return card_id and stored PIN block
+    SYS->>HSM: Verify received PIN vs stored PIN
+    HSM->>HSM: Both PINs match: 7890
+    HSM->>SYS: Return verification success
+    SYS->>DB: Update PIN block status to Active
+    SYS->>ATM: Approve transaction
+    ATM->>C: Display "Transaction Successful"
+
+    Note over SYS: PIN Activation Complete
+    SYS->>SYS: Card successfully activated with correct PIN
+```
+
+#### Security Mechanisms for PIN Mailer System
+```mermaid
+graph TB
+    subgraph "Generation Security"
+        A[Random PIN Generation] --> B[HSM Hardware Security]
+        B --> C[AES-256 Encryption]
+        C --> D[Secure Key Storage]
+    end
+
+    subgraph "Distribution Security"
+        E[Separate Mailing] --> F[Time Gap Between Mailings]
+        F --> G[Tamper-Evident Envelopes]
+        G --> H[No Card/PIN Correlation]
+    end
+
+    subgraph "Activation Security"
+        I[First-Time Verification] --> J[Immediate PIN Block Activation]
+        J --> K[Audit Logging]
+        K --> L[Fraud Detection Systems]
+    end
+
+    subgraph "Database Security"
+        M[Encrypted Storage] --> N[Access Controls]
+        N --> O[Audit Trails]
+        O --> P[Regular Security Audits]
+    end
+
+    style B fill:#e8f5e8
+    style G fill:#e3f2fd
+    style J fill:#fff3e0
+    style M fill:#f3e5f5
+```
+
+#### PIN Mailer Activation Workflow
+```mermaid
+graph LR
+    subgraph "Pre-Activation State"
+        A[Card Printed] --> B[PIN Mailer Printed]
+        B --> C[Both in Transit]
+        C --> D[Customer Receives Both]
+    end
+
+    subgraph "Activation Trigger"
+        D --> E[Customer Inserts Card]
+        E --> F[System Detects First Use]
+        F --> G[Pending Activation Status]
+    end
+
+    subgraph "Activation Process"
+        G --> H[Customer Enters PIN]
+        H --> I{PIN Matches Stored?}
+        I -->|Yes| J[Activate PIN Block]
+        I -->|No| K[Reject Transaction]
+
+        J --> L[Update Status to Active]
+        L --> M[Log Activation Event]
+        M --> N[Send Success Response]
+
+        K --> O[Increment Failed Attempts]
+        O --> P{Max Attempts?}
+        P -->|Yes| Q[Block Card]
+        P -->|No| R[Allow Retry]
+    end
+
+    subgraph "Post-Activation State"
+        N --> S[Card Fully Active]
+        Q --> T[Card Blocked]
+        R --> H
+    end
+
+    style J fill:#e8f5e8
+    style Q fill:#ffebee
+    style S fill:#e3f2fd
+```
+
+#### Error Handling in PIN Mailer Activation
+```mermaid
+graph TB
+    subgraph "Common Activation Issues"
+        A[Wrong PIN Entry] --> B[Customer confusion]
+        B --> C[Multiple failed attempts]
+        C --> D[Card temporary lock]
+
+        E[Lost PIN Mailer] --> F[Customer contacts bank]
+        F --> G[Identity verification]
+        G --> H[PIN reset process]
+
+        I[Damaged PIN Mailer] --> J[Illegible PIN]
+        J --> K[Secure replacement process]
+        K --> L[New PIN generation]
+    end
+
+    subgraph "System Error Handling"
+        M[Database lookup failure] --> N[Fallback verification]
+        N --> O[Manual intervention]
+        O --> P[System alert]
+
+        Q[Encryption key mismatch] --> R[Security lockdown]
+        R --> S[Investigation trigger]
+        S --> T[Key rotation]
+    end
+
+    subgraph "Customer Support Process"
+        U[Customer reports issue] --> V[Verify identity]
+        V --> W{Issue Type}
+        W -->|PIN related| X[PIN reset procedure]
+        W -->|Card related| Y[Card replacement]
+        W -->|System error| Z[Technical support]
+
+        X --> AA[Generate new PIN]
+        Y --> AB[Issue new card]
+        Z --> AC[Escalate to IT]
+    end
+
+    style D fill:#ffebee
+    style R fill:#ffebee
+    style AA fill:#e8f5e8
+    style AB fill:#e8f5e8
+```
+
 ### Method 3: Instant PIN Issuance (Branch Banking)
 
 #### Branch Counter PIN Selection
