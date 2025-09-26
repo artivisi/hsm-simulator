@@ -341,9 +341,11 @@ Proses aktivasi PIN mailer adalah mekanisme penting untuk menghubungkan PIN yang
 5. **Tamper-Evident Materials**: Materi pencetakan yang menunjukkan jika ada usaha pembongkaran
 
 #### PIN Mailer Content Security:
-- **PIN Encryption**: PIN dienkripsi dengan kunci khusus untuk pencetakan (`PRINT_KEY_PIN`)
-- **One-Time Use**: Data pencetakan hanya digunakan sekali lalu dihapus
-- **Secure Destruction**: Materi sisa pencetakan dimusnahkan secara aman
+- **Secure Decryption**: PIN hanya di-decrypt oleh HSM saat akan dicetak
+- **Plain Text in Mailer**: PIN mailer berisi plain text karena akan dibaca customer
+- **Tamper-Evident Envelope**: Amplop yang menunjukkan jika ada usaha pembongkaran
+- **One-Time Use**: Data PIN hanya muncul di cetakan mailer, tidak disimpan di sistem
+- **Secure Destruction**: Materi sisa pencetakan dan master file dimusnahkan aman
 - **Audit Trail**: Semua proses tercatat untuk audit keamanan
 
 #### Card-PIN Binding Process
@@ -410,23 +412,25 @@ sequenceDiagram
     Note over SYS,PP: Step 2: Secure PIN Mailer Production
     SYS->>HSM: Request PIN for mailer printing
     HSM->>HSM: Decrypt PIN block temporarily
-    HSM->>HSM: Encrypt PIN for printing: PRINT_KEY_PIN
-    HSM->>SYS: Return printing data (encrypted)
-    SYS->>PP: Send encrypted printing data to secure facility
-    PP->>PP: Secure printing with tamper-proof materials
-    PP->>PP: Quality control and destruction of materials
+    HSM->>SYS: Return PIN in plain text: 7890
+    SYS->>PP: Send PIN data to secure printing facility
+    PP->>PP: Print PIN mailer with plain text PIN: 7890
+    PP->>PP: Use tamper-evident envelope
+    PP->>PP: Quality control and secure packaging
 
     Note over SYS,C: Step 3: Physical Distribution
     SYS->>SYS: Print card with PAN: 1234567890123456
-    PP->>C: Mail PIN mailer with encrypted PIN data
+    PP->>C: Mail PIN mailer (plain text visible) to customer
     SYS->>C: Mail card separately (different time/channel)
 
     Note over C,ATM: Step 4: Customer Activation
+    C->>C: Open PIN mailer in private location
+    C->>C: Read plain text PIN: 7890
+    C->>C: Memorize PIN and destroy mailer
     C->>ATM: Insert card: 1234567890123456
     ATM->>ATM: Read PAN from card
     ATM->>C: Display "Enter PIN"
-    C->>C: Read PIN from secure mailer (decrypted by mailer system)
-    C->>ATM: Enter PIN: 7890
+    C->>ATM: Enter PIN: 7890 (from memory)
     ATM->>ATM: Generate PIN block with entered PIN
     ATM->>SYS: Send transaction request
 
@@ -450,36 +454,35 @@ graph TB
     subgraph "HSM Processing"
         A[Random PIN Generation] --> B[Create PIN Block]
         B --> C[Store in Database Encrypted]
-        C --> D[Decrypt for Printing]
-        D --> E[Re-encrypt for Print]
-        E --> F[Secure Deletion of Temporary Data]
+        C --> D[Decrypt for Printing Only]
+        D --> E[Secure Deletion of Temporary Data]
     end
 
     subgraph "Printing Facility"
-        G[Receive Encrypted Print Data] --> H[Secure Environment]
-        H --> I[Tamper-Proof Printing]
-        I --> J[Quality Control]
-        J --> K[Secure Packaging]
-        K --> L[Audit Trail]
+        F[Receive Plain Text PIN] --> G[Secure Environment]
+        G --> H[Tamper-Proof Printing]
+        H --> I[Quality Control]
+        I --> J[Secure Sealed Envelope]
+        J --> K[Audit Trail]
     end
 
     subgraph "Customer Process"
-        M[Receive Sealed Mailer] --> N[Open in Private]
-        N --> O[View PIN via Secure Method]
-        O --> P[Memorize PIN]
-        P --> Q[Destroy Mailer]
+        L[Receive Sealed Mailer] --> M[Open in Private]
+        M --> N[Read Plain Text PIN]
+        N --> O[Memorize PIN]
+        O --> P[Destroy Mailer]
     end
 
     subgraph "Bank Security"
-        R[Access Control] --> S[Background Checks]
-        S --> T[Surveillance]
-        T --> U[Segregation of Duties]
+        Q[Access Control] --> R[Background Checks]
+        R --> S[Surveillance]
+        S --> T[Segregation of Duties]
     end
 
     style A fill:#e8f5e8
-    style I fill:#e3f2fd
-    style O fill:#fff3e0
-    style R fill:#f3e5f5
+    style H fill:#e3f2fd
+    style N fill:#fff3e0
+    style Q fill:#f3e5f5
 ```
 
 ### 2.3 PIN Block Lifecycle Management
