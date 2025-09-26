@@ -214,9 +214,9 @@ graph TB
         D --> E[Set 24-hour Expiration]
     end
 
-    F[Generated Links] --> G[Custodian A: /contribute/CER-001/A/[token]]
-    F --> H[Custodian B: /contribute/CER-001/B/[token]]
-    F --> I[Custodian C: /contribute/CER-001/C/[token]]
+    F[Generated Links] --> G["Custodian A: /contribute/CER-001/A/[token]"]
+    F --> H["Custodian B: /contribute/CER-001/B/[token]"]
+    F --> I["Custodian C: /contribute/CER-001/C/[token]"]
 ```
 
 #### 2.3 Send Email Invitations
