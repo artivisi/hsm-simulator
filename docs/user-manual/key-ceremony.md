@@ -404,7 +404,7 @@ graph TB
         E -->|No| F[Wait Mode]
         E -->|Yes| G[Combine Passphrases]
 
-        G --> H[Hash Combination: HASH(Cont_A || Cont_B || Cont_C)]
+        G --> H["Hash Combination: HASH(Cont_A || Cont_B || Cont_C)"]
         H --> I[Key Derivation: KDF(Combined_Entropy)]
         I --> J[Master Key Generated]
 
