@@ -1,0 +1,13 @@
+{
+  "name": "hsm-simulator",
+  "version": "0.0.1-SNAPSHOT",
+  "description": "HSM Simulator Application",
+  "scripts": {
+    "build": "tailwindcss -i ./src/main/resources/static/css/input.css -o ./src/main/resources/static/css/output.css --watch",
+    "build-prod": "tailwindcss -i ./src/main/resources/static/css/input.css -o ./src/main/resources/static/css/output.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^4.1.0",
+    "@tailwindcss/cli": "^4.1.0"
+  }
+}
