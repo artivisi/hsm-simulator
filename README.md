@@ -1007,6 +1007,8 @@ Untuk pertanyaan atau dukungan:
 [![GLM-4.5 by Z.ai](https://img.shields.io/badge/Powered%20by-GLM--4.5%20by%20Z.ai-blue?style=for-the-badge&logo=ai&logoColor=white)](https://z.ai)
 [![Claude Code](https://img.shields.io/badge/Coded%20with-Claude%20Code-orange?style=for-the-badge&logo=anthropic&logoColor=white)](https://claude.ai/code)
 
+</div>
+
 This project was developed with the assistance of **GLM-4.5 by Z.ai** and **Claude Code by Anthropic** as AI coding assistants.
 
 **Project Highlights:**
@@ -1018,5 +1020,3 @@ This project was developed with the assistance of **GLM-4.5 by Z.ai** and **Clau
 - 🚀 Production-ready deployment configuration
 
 All AI-generated code has been reviewed, tested, and validated for production use.
-
-</div>
