@@ -15,6 +15,8 @@
 
 Platform simulasi Hardware Security Module (HSM) yang komprehensif dibangun dengan Spring Boot, dilengkapi antarmuka web modern dengan Tailwind CSS dan Thymeleaf Layout Dialect. Simulator ini menyediakan antarmuka berbasis web untuk mengeksplorasi kemampuan HSM dan operasi kriptografi.
 
+⚠️ **Untuk Kepentingan Edukasi**: Aplikasi ini merupakan simulator pembelajaran dan **tidak dimaksudkan untuk penggunaan production**.
+
 ## Fitur
 
 ### 🌐 Antarmuka Web
@@ -578,7 +580,7 @@ Untuk pertanyaan atau dukungan:
 
 ---
 
-## Bantuan Pengembangan AI
+## Pengembangan dengan Bantuan AI
 
 <div align="center">
 
@@ -595,6 +597,11 @@ Proyek ini dikembangkan dengan bantuan **GLM-4.5 oleh Z.ai** dan **Claude Code o
 - 📱 Desain responsif dengan Thymeleaf Layout Dialect
 - 🗄️ Database PostgreSQL dengan Flyway migrations
 - 🧪 Setup testing komprehensif dengan TestContainer dan Playwright
-- 🚀 Konfigurasi build siap produksi
+- 🚀 Konfigurasi build untuk development
 
-Semua kode yang dihasilkan AI telah ditinjau, diuji, dan divalidasi untuk penggunaan produksi.
+⚠️ **Penting: Disclaimer**
+- Kode yang dihasilkan AI **belum sepenuhnya diverifikasi** dan mungkin mengandung kesalahan
+- Aplikasi ini **hanya simulator untuk kepentingan edukasi**
+- **Tidak direkomendasikan untuk deployment di environment production**
+- Harap ditinjau dan diuji secara menyeluruh sebelum digunakan
+- Gunakan hanya untuk pembelajaran konsep HSM dan kriptografi
