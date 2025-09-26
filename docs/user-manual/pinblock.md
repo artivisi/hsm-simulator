@@ -329,7 +329,22 @@ erDiagram
 
 ### 2.2 PIN Mailer Activation Process
 
-Proses aktivasi PIN mailer adalah mekanisme penting untuk menghubungkan PIN yang dihasilkan secara acak dengan kartu yang diterima nasabah.
+Proses aktivasi PIN mailer adalah mekanisme penting untuk menghubungkan PIN yang dihasilkan secara acak dengan kartu yang diterima nasabah. Sistem ini menjamin keamanan melalui beberapa lapisan proteksi.
+
+### 2.2.1 Security Principles for PIN Mailer
+
+#### Key Security Points:
+1. **PIN Never in Plain Text**: PIN selalu terenkripsi selama proses
+2. **HSM Control**: Semua operasi PIN melalui HSM untuk keamanan hardware
+3. **Secure Printing**: Pencetakan di fasilitas aman dengan kontrol ketat
+4. **Separation of Duties**: Pemisahan tugas antara generasi, pencetakan, dan distribusi
+5. **Tamper-Evident Materials**: Materi pencetakan yang menunjukkan jika ada usaha pembongkaran
+
+#### PIN Mailer Content Security:
+- **PIN Encryption**: PIN dienkripsi dengan kunci khusus untuk pencetakan (`PRINT_KEY_PIN`)
+- **One-Time Use**: Data pencetakan hanya digunakan sekali lalu dihapus
+- **Secure Destruction**: Materi sisa pencetakan dimusnahkan secara aman
+- **Audit Trail**: Semua proses tercatat untuk audit keamanan
 
 #### Card-PIN Binding Process
 ```mermaid
@@ -381,35 +396,45 @@ sequenceDiagram
     participant SYS as Banking System
     participant DB as Database
     participant HSM as HSM
+    participant PP as Print Provider
     participant C as Customer
     participant ATM as ATM Terminal
 
-    Note over SYS,DB: Step 1: Card-PIN Pair Generation
+    Note over SYS,HSM: Step 1: Card-PIN Pair Generation
     SYS->>SYS: Generate card number: 1234567890123456
     SYS->>HSM: Generate random PIN: 7890
     HSM->>HSM: Create PIN block: ABC123DEF456...
     HSM->>SYS: Return encrypted PIN block
-    SYS->>DB: Store with card_id link
+    SYS->>DB: Store encrypted PIN block with card_id link
 
-    Note over SYS,C: Step 2: Physical Distribution
+    Note over SYS,PP: Step 2: Secure PIN Mailer Production
+    SYS->>HSM: Request PIN for mailer printing
+    HSM->>HSM: Decrypt PIN block temporarily
+    HSM->>HSM: Encrypt PIN for printing: PRINT_KEY_PIN
+    HSM->>SYS: Return printing data (encrypted)
+    SYS->>PP: Send encrypted printing data to secure facility
+    PP->>PP: Secure printing with tamper-proof materials
+    PP->>PP: Quality control and destruction of materials
+
+    Note over SYS,C: Step 3: Physical Distribution
     SYS->>SYS: Print card with PAN: 1234567890123456
-    SYS->>SYS: Print PIN mailer with PIN: 7890
-    SYS->>C: Mail card to customer address
-    SYS->>C: Mail PIN mailer separately
+    PP->>C: Mail PIN mailer with encrypted PIN data
+    SYS->>C: Mail card separately (different time/channel)
 
-    Note over C,ATM: Step 3: Customer Activation
+    Note over C,ATM: Step 4: Customer Activation
     C->>ATM: Insert card: 1234567890123456
     ATM->>ATM: Read PAN from card
     ATM->>C: Display "Enter PIN"
-    C->>ATM: Enter PIN: 7890 (from mailer)
+    C->>C: Read PIN from secure mailer (decrypted by mailer system)
+    C->>ATM: Enter PIN: 7890
     ATM->>ATM: Generate PIN block with entered PIN
     ATM->>SYS: Send transaction request
 
-    Note over SYS,DB: Step 4: System Verification
+    Note over SYS,HSM: Step 5: System Verification
     SYS->>DB: Find card_id for PAN: 1234567890123456
-    DB->>SYS: Return card_id and stored PIN block
-    SYS->>HSM: Verify received PIN vs stored PIN
-    HSM->>HSM: Both PINs match: 7890
+    DB->>SYS: Return card_id and stored encrypted PIN block
+    SYS->>HSM: Verify received PIN block vs stored PIN block
+    HSM->>HSM: Decrypt both and compare PIN values: 7890
     HSM->>SYS: Return verification success
     SYS->>DB: Update PIN block status to Active
     SYS->>ATM: Approve transaction
@@ -417,6 +442,44 @@ sequenceDiagram
 
     Note over SYS: PIN Activation Complete
     SYS->>SYS: Card successfully activated with correct PIN
+```
+
+#### PIN Mailer Security Flow
+```mermaid
+graph TB
+    subgraph "HSM Processing"
+        A[Random PIN Generation] --> B[Create PIN Block]
+        B --> C[Store in Database Encrypted]
+        C --> D[Decrypt for Printing]
+        D --> E[Re-encrypt for Print]
+        E --> F[Secure Deletion of Temporary Data]
+    end
+
+    subgraph "Printing Facility"
+        G[Receive Encrypted Print Data] --> H[Secure Environment]
+        H --> I[Tamper-Proof Printing]
+        I --> J[Quality Control]
+        J --> K[Secure Packaging]
+        K --> L[Audit Trail]
+    end
+
+    subgraph "Customer Process"
+        M[Receive Sealed Mailer] --> N[Open in Private]
+        N --> O[View PIN via Secure Method]
+        O --> P[Memorize PIN]
+        P --> Q[Destroy Mailer]
+    end
+
+    subgraph "Bank Security"
+        R[Access Control] --> S[Background Checks]
+        S --> T[Surveillance]
+        T --> U[Segregation of Duties]
+    end
+
+    style A fill:#e8f5e8
+    style I fill:#e3f2fd
+    style O fill:#fff3e0
+    style R fill:#f3e5f5
 ```
 
 ### 2.3 PIN Block Lifecycle Management
