@@ -130,8 +130,11 @@ sequenceDiagram
 
     C->>T: Insert Card & Enter PIN
     T->>T: Generate PIN Block (ISO format)
-    T->>AB_HSM: Encrypt PIN Block with TMK
-    AB_HSM->>AB: Return encrypted PIN Block
+    T->>T: Encrypt PIN Block with TPK
+    T->>AB: Send encrypted PIN Block
+    AB->>AB_HSM: Decrypt PIN Block with TPK
+    AB_HSM->>AB_HSM: Verify PIN against customer data
+    AB_HSM->>AB: Return verification result
     AB->>NW: Send transaction request<br/>(with encrypted PIN Block)
 
     NW->>IB: Forward transaction
@@ -208,34 +211,44 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 ### Penggunaan Kunci dalam Arsitektur
 
 #### 1. TMK (Terminal Master Key)
-- **Fungsi**: Kunci master untuk komunikasi antara terminal dan HSM bank
+- **Fungsi**: Kunci master untuk mengamankan distribusi kunci ke terminal
 - **Penggunaan**:
-  - Mengenkripsi PIN yang dikirim dari terminal ke HSM
-  - Mengamankan komunikasi internal bank-terminal
+  - Mengenkripsi kunci-kunci (TPK, TSK) saat dikirim ke terminal
+  - Key exchange antara bank dan terminal
+  - Mengamankan proses key loading ke terminal
 - **Distribusi**: Diinject ke terminal secara aman oleh bank
 
-#### 2. TSK (Terminal Security Key)
+#### 2. TPK (Terminal PIN Key)
+- **Fungsi**: Kunci khusus untuk mengenkripsi PIN Block di terminal
+- **Penggunaan**:
+  - Mengenkripsi PIN Block sebelum dikirim ke bank
+  - Bank mendekripsi PIN Block dengan TPK yang sama
+  - Melindungi PIN selama transmisi terminal ke bank
+- **Distribusi**: Dikirim ke terminal dengan enkripsi TMK
+
+#### 3. TSK (Terminal Security Key)
 - **Fungsi**: Kunci keamanan untuk operasi spesifik terminal
 - **Penggunaan**:
+  - Generate MAC (Message Authentication Code)
   - Verifikasi integritas data dari terminal
   - Autentikasi terminal ke HSM
-- **Distribusi**: Didistribusikan bersama TMK
+- **Distribusi**: Dikirim ke terminal dengan enkripsi TMK
 
-#### 3. ZMK (Zone Master Key)
+#### 4. ZMK (Zone Master Key)
 - **Fungsi**: Kunci master untuk mengamankan distribusi kunci antar bank
 - **Penggunaan**:
   - Mengenkripsi kunci-kunci (ZPK, ZSK) saat dikirim antar bank
   - Key exchange protocol antar bank
 - **Distribusi**: Diatur oleh payment network atau KMS sentral
 
-#### 4. ZPK (Zone PIN Key)
+#### 5. ZPK (Zone PIN Key)
 - **Fungsi**: Kunci khusus untuk PIN-related data dalam komunikasi antar bank
 - **Penggunaan**:
   - Mengenkripsi PIN block saat transfer antar bank
   - Melindungi PIN data selama proses inter-bank
 - **Distribusi**: Dikirim antar bank dengan enkripsi ZMK
 
-#### 5. ZSK (Zone Session Key)
+#### 6. ZSK (Zone Session Key)
 - **Fungsi**: Kunci sesi untuk mengenkripsi data transaksi antar bank
 - **Penggunaan**:
   - Mengenkripsi data transaksi non-PIN antar bank
@@ -244,7 +257,7 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 
 ### Alur Keamanan Transaksi
 
-1. **PIN Entry**: PIN dikonversi menjadi PIN Block di terminal, kemudian dienkripsi dengan TMK
+1. **PIN Entry**: PIN dikonversi menjadi PIN Block di terminal, kemudian dienkripsi dengan TPK di dalam terminal
 2. **Authorization**: PIN Block diverifikasi di HSM issuer bank tanpa mengembalikan PIN plaintext
 3. **Key Exchange**: ZPK dan ZSK didistribusikan antar bank dengan enkripsi ZMK
 4. **Inter-bank PIN Data**: PIN-related data antar bank dienkripsi dengan ZPK
@@ -252,6 +265,7 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 6. **Settlement**: Data settlement dienkripsi dengan ZSK untuk transfer dana antar bank
 7. **Key Rotation**: Semua kunci dirotasi secara berkala untuk keamanan
 8. **PIN Security**: PIN tidak pernah dikirim dalam bentuk plaintext antar sistem
+9. **Key Hierarchy**: TMK mengamankan TPK/TSK, ZMK mengamankan ZPK/ZSK
 
 Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan dengan memanfaatkan HSM untuk semua operasi kriptografi kritis.
 
