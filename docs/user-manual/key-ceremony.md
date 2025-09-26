@@ -452,7 +452,7 @@ System update status secara real-time:
 graph LR
     subgraph "Key Share Generation"
         A[Master Key] --> B[Generate Random Polynomial]
-        B --> C[f(x) = a₀ + a₁x + a₂x² where a₀ = Master Key]
+        B --> C["f(x) = a₀ + a₁x + a₂x² where a₀ = Master Key"]
         C --> D[Evaluate at x=1,2,3]
         D --> E[Share 1 = f(1)]
         D --> F[Share 2 = f(2)]
@@ -620,15 +620,15 @@ Untuk pembelajaran, system menyediakan educational view:
 ```mermaid
 graph TB
     subgraph "Educational View Components"
-        A[Master Key Components] --> B[Original Master Key (Hexadecimal)]
-        A --> C[Individual Contributions (Passphrases)]
-        A --> D[Combined Entropy (Hash Result)]
-        A --> E[Key Generation Steps (Mathematical Process)]
+        A[Master Key Components] --> B["Original Master Key (Hexadecimal)"]
+        A --> C["Individual Contributions (Passphrases)"]
+        A --> D["Combined Entropy (Hash Result)"]
+        A --> E["Key Generation Steps (Mathematical Process)"]
 
         F[Shamir's Secret Sharing] --> G[Prime Number]
-        F --> H[Polynomial Coefficients]
-        F --> I[Share Calculations]
-        F --> J[Reconstruction Formula]
+        F --> H["Polynomial Coefficients"]
+        F --> I["Share Calculations"]
+        F --> J["Reconstruction Formula"]
     end
 ```
 
