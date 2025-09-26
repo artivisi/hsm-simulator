@@ -43,6 +43,202 @@ A comprehensive Hardware Security Module (HSM) simulation platform built with Sp
 - Performance metrics and monitoring
 - Health status indicators
 
+## Arsitektur Sistem Perbankan dengan HSM
+
+### Diagram Arsitektur Lengkap
+
+```mermaid
+graph TB
+    subgraph "Issuer Bank"
+        IB[Issuer Bank App]
+        IB_HSM[HSM Issuer Bank]
+        IB_Terminal[Terminal Issuer Bank]
+        IB --> IB_HSM
+        IB --> IB_Terminal
+        IB_HSM --> IB_Terminal
+    end
+
+    subgraph "Acquiring Bank"
+        AB[Acquiring Bank App]
+        AB_HSM[HSM Acquiring Bank]
+        AB_Terminal[Terminal Acquiring Bank]
+        AB --> AB_HSM
+        AB --> AB_Terminal
+        AB_HSM --> AB_Terminal
+    end
+
+    subgraph "Beneficiary Bank"
+        BB[Beneficiary Bank App]
+        BB_HSM[HSM Beneficiary Bank]
+        BB_Terminal[Terminal Beneficiary Bank]
+        BB --> BB_HSM
+        BB --> BB_Terminal
+        BB_HSM --> BB_Terminal
+    end
+
+    subgraph "Network"
+        NW[Payment Network<br/>SWITCH/VISA/MASTERCARD]
+    end
+
+    subgraph "Key Management"
+        KMS[Key Management System<br/>ZMK/ZPK Generator]
+    end
+
+    %% Connections between banks
+    IB <--> NW
+    AB <--> NW
+    BB <--> NW
+
+    %% Key management connections
+    KMS --> IB_HSM
+    KMS --> AB_HSM
+    KMS --> BB_HSM
+
+    %% Terminal connections
+    IB_Terminal <--> AB_Terminal
+    AB_Terminal <--> BB_Terminal
+
+    %% Style definitions
+    classDef bankApp fill:#e1f5fe,stroke:#0288d1,stroke-width:2px
+    classDef hsm fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
+    classDef terminal fill:#e8f5e8,stroke:#388e3c,stroke-width:2px
+    classDef network fill:#fff3e0,stroke:#f57c00,stroke-width:2px
+    classDef kms fill:#fce4ec,stroke:#c2185b,stroke-width:2px
+
+    class IB,AB,BB bankApp
+    class IB_HSM,AB_HSM,BB_HSM hsm
+    class IB_Terminal,AB_Terminal,BB_Terminal terminal
+    class NW network
+    class KMS kms
+```
+
+### Diagram Alur Transaksi dengan Key Management
+
+```mermaid
+sequenceDiagram
+    participant C as Cardholder
+    participant T as Terminal (Acquiring)
+    participant AB as Acquiring Bank App
+    participant AB_HSM as HSM Acquiring
+    participant NW as Payment Network
+    participant IB as Issuer Bank App
+    participant IB_HSM as HSM Issuer
+    participant BB as Beneficiary Bank
+    participant BB_HSM as HSM Beneficiary
+
+    Note over C,BB_HSM: Transaction Flow with Key Management
+
+    C->>T: Insert Card & Enter PIN
+    T->>AB_HSM: Encrypt PIN with TMK
+    AB_HSM->>AB: Return encrypted PIN block
+    AB->>NW: Send transaction request<br/>(with encrypted PIN)
+
+    NW->>IB: Forward transaction
+    IB->>IB_HSM: Decrypt PIN with TMK
+    IB_HSM->>IB: Return decrypted PIN
+
+    Note over IB,IB_HSM: Authorization Process
+    IB->>IB_HSM: Verify PIN
+    IB_HSM->>IB: PIN verification result
+    IB->>NW: Authorization response
+
+    NW->>AB: Forward response
+    AB->>T: Display transaction result
+    T->>C: Show result & receipt
+
+    Note over AB,BB_HSM: Settlement Process
+    AB->>BB: Settlement request<br/>(encrypted with ZPK)
+    BB->>BB_HSM: Decrypt with ZPK
+    BB_HSM->>BB: Process settlement
+    BB->>AB: Settlement confirmation
+```
+
+### Penjelasan Arsitektur
+
+Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama:
+
+1. **Issuer Bank**: Bank yang menerbitkan kartu kepada nasabah
+2. **Acquiring Bank**: Bank yang menerima transaksi dari merchant
+3. **Beneficiary Bank**: Bank penerima dana (dalam transfer antar bank)
+
+### Hubungan Antar Komponen
+
+1. **Internal Bank Connection**:
+   - Setiap bank memiliki aplikasi internal yang terhubung dengan HSM-nya
+   - HSM mengelola semua operasi kriptografi untuk terminal-terminal di bawahnya
+   - Terminal-terminal terhubung langsung dengan HSM untuk keamanan
+
+2. **Inter-Bank Connection**:
+   - Semua bank terhubung melalui Payment Network (SWITCH/VISA/MASTERCARD)
+   - Komunikasi antar bank dienkripsi menggunakan ZMK (Zone Master Key)
+   - Settlement antar bank menggunakan ZPK (Zone PIN Key)
+
+3. **Key Management System**:
+   - Sentral untuk menghasilkan dan mendistribusikan kunci ke semua HSM
+   - Mengelola siklus hidup kunci kriptografi
+
+### Fitur-Fitur HSM untuk Mendukung Transaksi
+
+1. **PIN Management**:
+   - PIN generation dan verification
+   - PIN block format (ISO-0, ISO-1, ISO-3)
+   - PIN translation antar format
+
+2. **Key Management**:
+   - Key generation (TMK, TSK, ZMK, ZPK)
+   - Key storage dengan keamanan tingkat tinggi
+   - Key rotation dan lifecycle management
+
+3. **Cryptographic Operations**:
+   - Encryption/Decryption (3DES, AES)
+   - MAC generation dan verification
+   - Digital signature
+
+4. **Transaction Security**:
+   - EMV cryptogram verification
+   - ARQC (Application Request Cryptogram) generation
+   - AAC (Application Authentication Cryptogram) verification
+
+### Penggunaan Kunci dalam Arsitektur
+
+#### 1. TMK (Terminal Master Key)
+- **Fungsi**: Kunci master untuk komunikasi antara terminal dan HSM bank
+- **Penggunaan**:
+  - Mengenkripsi PIN yang dikirim dari terminal ke HSM
+  - Mengamankan komunikasi internal bank-terminal
+- **Distribusi**: Diinject ke terminal secara aman oleh bank
+
+#### 2. TSK (Terminal Security Key)
+- **Fungsi**: Kunci keamanan untuk operasi spesifik terminal
+- **Penggunaan**:
+  - Verifikasi integritas data dari terminal
+  - Autentikasi terminal ke HSM
+- **Distribusi**: Didistribusikan bersama TMK
+
+#### 3. ZMK (Zone Master Key)
+- **Fungsi**: Kunci master untuk komunikasi antar bank
+- **Penggunaan**:
+  - Mengenkripsi data sensitif antar bank
+  - Mengamankan komunikasi di payment network
+- **Distribusi**: Diatur oleh payment network atau KMS sentral
+
+#### 4. ZPK (Zone PIN Key)
+- **Fungsi**: Kunci khusus untuk PIN dalam komunikasi antar bank
+- **Penggunaan**:
+  - Mengenkripsi PIN saat transfer antar bank
+  - Melindungi PIN selama proses settlement
+- **Distribusi**: Dikelola oleh KMS dengan prosedur keamanan ketat
+
+### Alur Keamanan Transaksi
+
+1. **PIN Entry**: PIN dienkripsi di terminal menggunakan TMK
+2. **Authorization**: PIN didekripsi di HSM issuer bank untuk verifikasi
+3. **Inter-bank Communication**: Data sensitif dienkripsi dengan ZMK
+4. **Settlement**: PIN untuk transfer antar bank dienkripsi dengan ZPK
+5. **Key Rotation**: Semua kunci dirotasi secara berkala untuk keamanan
+
+Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan dengan memanfaatkan HSM untuk semua operasi kriptografi kritis.
+
 ## Technology Stack
 
 - **Backend**: Spring Boot 3.5.6 with Java 21
