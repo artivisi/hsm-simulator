@@ -405,7 +405,7 @@ graph TB
         E -->|Yes| G[Combine Passphrases]
 
         G --> H["Hash Combination: HASH(Cont_A || Cont_B || Cont_C)"]
-        H --> I[Key Derivation: KDF(Combined_Entropy)]
+        H --> I["Key Derivation: KDF(Combined_Entropy)"]
         I --> J[Master Key Generated]
 
         J --> K[Generate Key ID]
@@ -453,20 +453,20 @@ graph LR
     subgraph "Key Share Generation"
         A[Master Key] --> B[Generate Random Polynomial]
         B --> C["f(x) = a₀ + a₁x + a₂x² where a₀ = Master Key"]
-        C --> D[Evaluate at x=1,2,3]
-        D --> E[Share 1 = f(1)]
-        D --> F[Share 2 = f(2)]
-        D --> G[Share 3 = f(3)]
+        C --> D["Evaluate at x=1,2,3"]
+        D --> E["Share 1 = f(1)"]
+        D --> F["Share 2 = f(2)"]
+        D --> G["Share 3 = f(3)"]
     end
 
     subgraph "Distribution"
-        E --> H[Send to Custodian A]
-        F --> I[Send to Custodian B]
-        G --> J[Send to Custodian C]
+        E --> H["Send to Custodian A"]
+        F --> I["Send to Custodian B"]
+        G --> J["Send to Custodian C"]
     end
 
     subgraph "Recovery Capability"
-        H --> K[Need 2 shares to recover master key]
+        H --> K["Need 2 shares to recover master key"]
         I --> K
         J --> K
     end
