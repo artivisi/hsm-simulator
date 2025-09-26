@@ -239,6 +239,49 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 
 Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan dengan memanfaatkan HSM untuk semua operasi kriptografi kritis.
 
+## Dokumentasi Penggunaan dan Pengujian
+
+### 📚 User Manual
+Dokumentasi lengkap untuk penggunaan HSM Simulator:
+
+| Manual | Deskripsi | Link |
+|--------|-----------|------|
+| **PIN Block Operations** | Panduan lengkap operasi PIN block dengan format ISO-0, ISO-1, ISO-2, dan ISO-3. Termasuk enkripsi, dekripsi, dan verifikasi PIN block untuk transaksi perbankan. | [docs/user-manual/pinblock.md](docs/user-manual/pinblock.md) |
+| **Key Ceremony** | Prosedur lengkap inisialisasi dan pemulihan master key HSM menggunakan mekanisme 2-of-3 threshold scheme dengan Shamir's Secret Sharing. | [docs/user-manual/key-ceremony.md](docs/user-manual/key-ceremony.md) |
+| **Terminal Key Management** | Panduan pengelolaan kunci terminal termasuk TMK (Terminal Master Key) dan TSK (Terminal Security Key) untuk komunikasi aman bank-terminal. | [docs/user-manual/terminal-key.md](docs/user-manual/terminal-key.md) |
+
+### 🧪 Test Scenario
+Skenario pengujian untuk memvalidasi fitur-fitur HSM Simulator:
+
+| Skenario | Deskripsi | Link |
+|----------|-----------|------|
+| **PIN Block Testing** | Skenario pengujian komprehensif untuk operasi PIN block termasuk format validation, encryption/decryption, dan edge case testing. | [docs/test-scenario/pinblock.md](docs/test-scenario/pinblock.md) |
+| **Key Ceremony Testing** | Skenario pengujian key ceremony dengan simulasi 3 custodian dan threshold 2-of-3. Termasuk inisialisasi dan pemulihan master key. | [docs/test-scenario/key-ceremony.md](docs/test-scenario/key-ceremony.md) |
+| **Terminal Keys Testing** | Skenario pengujian manajemen kunci terminal untuk validasi keamanan komunikasi antara terminal dan HSM bank. | [docs/test-scenario/terminal-keys.md](docs/test-scenario/terminal-keys.md) |
+
+### 🔍 Fitur Dokumentasi
+
+#### User Manual Features:
+- **Step-by-step guidance**: Instruksi detail untuk setiap operasi HSM
+- **Educational mode**: Penjelasan konsep kriptografi dengan visualisasi
+- **Security considerations**: Best practice dan peringatan keamanan
+- **Real-world examples**: Contoh implementasi dalam industri perbankan
+- **Interface navigation**: Panduan penggunaan web interface
+
+#### Test Scenario Features:
+- **Comprehensive test cases**: Coverage untuk semua fitur utama
+- **Edge case testing**: Pengujian kondisi boundary dan error handling
+- **Integration testing**: Validasi end-to-end flow
+- **Performance validation**: Pengujian throughput dan response time
+- **Security validation**: Verifikasi keamanan implementasi
+
+### 📖 Cara Menggunakan Dokumentasi
+
+1. **Untuk Pembelajaran**: Mulai dari User Manual untuk memahami konsep dan cara penggunaan
+2. **Untuk Pengujian**: Gunakan Test Scenario untuk memvalidasi implementasi
+3. **Untuk Development**: Referensi dokumentasi saat mengembangkan fitur baru
+4. **Untuk Troubleshooting**: Gunakan test scenario untuk debugging dan issue resolution
+
 ## Technology Stack
 
 - **Backend**: Spring Boot 3.5.6 with Java 21
