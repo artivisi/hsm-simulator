@@ -381,7 +381,11 @@ Buka browser dan navigasi ke: `http://localhost:8080`
 
 ### Frontend Development (Tailwind CSS)
 
-Untuk development dengan hot reload:
+Tailwind CSS sudah terintegrasi dengan Maven melalui frontend-maven-plugin dan akan otomatis terkompilasi saat:
+- `mvn clean install` - Build lengkap dengan kompilasi Tailwind
+- `mvn spring-boot:run` - Jalankan aplikasi dengan kompilasi otomatis
+
+Untuk development dengan hot reload (opsional):
 ```bash
 # Install dependencies
 npm install
@@ -390,7 +394,7 @@ npm install
 npm run build
 ```
 
-Untuk production build:
+Untuk production build manual (opsional):
 ```bash
 npm run build-prod
 ```
