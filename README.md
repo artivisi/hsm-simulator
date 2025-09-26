@@ -119,7 +119,7 @@ sequenceDiagram
     participant C as Cardholder
     participant T as Terminal (Acquiring)
     participant AB as Acquiring Bank App
-    participant AB_HSM as HSM Acquiring
+    participant AB_HSM as HSM Acquirer
     participant NW as Payment Network
     participant IB as Issuer Bank App
     participant IB_HSM as HSM Issuer
@@ -127,20 +127,24 @@ sequenceDiagram
     participant BB_HSM as HSM Beneficiary
 
     Note over C,BB_HSM: Transaction Flow with Key Management
+    Note over AB,AB_HSM: Acquirer: Validate & PIN Translation (TPK→ZPK)
+    Note over IB,IB_HSM: Issuer: PIN Translation (ZPK→TPK) & Verify
 
     C->>T: Insert Card & Enter PIN
     T->>T: Generate PIN Block (ISO format)
     T->>T: Encrypt PIN Block with TPK
     T->>AB: Send encrypted PIN Block
-    AB->>AB_HSM: Decrypt PIN Block with TPK
-    AB_HSM->>AB_HSM: Verify PIN against customer data
-    AB_HSM->>AB: Return verification result
-    AB->>NW: Send transaction request<br/>(with encrypted PIN Block)
+    AB->>AB_HSM: Verify cryptographic integrity
+    AB_HSM->>AB: Return validation result
+    AB->>AB_HSM: PIN Translation: TPK → ZPK
+    AB_HSM->>AB: Return translated PIN Block
+    AB->>NW: Send transaction request<br/>(with PIN Block encrypted with ZPK)
 
     NW->>IB: Forward transaction
     IB->>IB_HSM: Verify encrypted PIN Block
     Note over IB,IB_HSM: Authorization Process
-    IB_HSM->>IB_HSM: Decrypt PIN Block with TMK
+    IB_HSM->>IB_HSM: PIN Translation: ZPK → TPK
+    IB_HSM->>IB_HSM: Decrypt PIN Block with TPK
     IB_HSM->>IB_HSM: Verify PIN against customer data
     IB_HSM->>IB: Return verification result (approve/reject)
     IB->>NW: Authorization response
@@ -192,6 +196,7 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
    - PIN generation dan verification
    - PIN block format (ISO-0, ISO-1, ISO-3)
    - PIN translation antar format
+   - PIN translation antar kunci (TPK↔ZPK)
 
 2. **Key Management**:
    - Key generation (TMK, TSK, ZMK, ZPK)
@@ -222,7 +227,7 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 - **Fungsi**: Kunci khusus untuk mengenkripsi PIN Block di terminal
 - **Penggunaan**:
   - Mengenkripsi PIN Block sebelum dikirim ke bank
-  - Bank mendekripsi PIN Block dengan TPK yang sama
+  - Digunakan untuk PIN Translation dari TPK ke ZPK untuk inter-bank
   - Melindungi PIN selama transmisi terminal ke bank
 - **Distribusi**: Dikirim ke terminal dengan enkripsi TMK
 
@@ -258,7 +263,7 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 ### Alur Keamanan Transaksi
 
 1. **PIN Entry**: PIN dikonversi menjadi PIN Block di terminal, kemudian dienkripsi dengan TPK di dalam terminal
-2. **Authorization**: PIN Block diverifikasi di HSM issuer bank tanpa mengembalikan PIN plaintext
+2. **Authorization**: Acquirer memvalidasi integritas, melakukan PIN Translation (TPK→ZPK), dan meneruskan ke issuer. Issuer melakukan PIN Translation (ZPK→TPK), mendekripsi, dan memverifikasi PIN
 3. **Key Exchange**: ZPK dan ZSK didistribusikan antar bank dengan enkripsi ZMK
 4. **Inter-bank PIN Data**: PIN-related data antar bank dienkripsi dengan ZPK
 5. **Inter-bank Transaction Data**: Data transaksi antar bank dienkripsi dengan ZSK
@@ -266,6 +271,9 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 7. **Key Rotation**: Semua kunci dirotasi secara berkala untuk keamanan
 8. **PIN Security**: PIN tidak pernah dikirim dalam bentuk plaintext antar sistem
 9. **Key Hierarchy**: TMK mengamankan TPK/TSK, ZMK mengamankan ZPK/ZSK
+10. **Acquirer Role**: HSM acquirer hanya memvalidasi integritas, tidak pernah mendekripsi PIN Block
+11. **Issuer Role**: HSM issuer satu-satunya pihak yang mendekripsi dan memverifikasi PIN
+12. **PIN Translation**: Konversi PIN Block antar kunci (TPK↔ZPK) untuk komunikasi inter-bank
 
 Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan dengan memanfaatkan HSM untuk semua operasi kriptografi kritis.
 
