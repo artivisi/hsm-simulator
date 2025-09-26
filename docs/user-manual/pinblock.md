@@ -758,13 +758,13 @@ graph TB
     end
 
     subgraph "PIN Selection Process"
-        D --> E[Prompt: "Create new PIN"]
+        D --> E["Prompt: Create new PIN"]
         E --> F[Customer enters PIN]
         F --> G[Validate PIN format]
         G --> H{PIN valid?}
         H -->|No| I[Show error message]
         I --> E
-        H -->|Yes| J[Prompt: "Confirm PIN"]
+        H -->|Yes| J["Prompt: Confirm PIN"]
         J --> K[Customer re-enters PIN]
         K --> L{PINs match?}
         L -->|No| M[Show mismatch error]
@@ -803,8 +803,8 @@ stateDiagram-v2
     EnterNewPIN --> ValidatePIN: Validate Format
     ValidatePIN --> ConfirmPIN: "Confirm PIN"
     ConfirmPIN --> VerifyMatch: Verify Match
-    VerifyMatch --> PINMatched: Match ✓
-    VerifyMatch --> PINMismatch: Mismatch ✗
+    VerifyMatch --> PINMatched: "Match ✓"
+    VerifyMatch --> PINMismatch: "Mismatch ✗"
 
     PINMismatch --> CreatePIN: Try Again
     PINMatched --> GeneratePINBlock: Generate PIN Block
