@@ -1,0 +1,17 @@
+services:
+  postgres:
+    image: 'postgres:17'
+    container_name: hsm-simulator-postgres
+    environment:
+      - 'POSTGRES_DB=hsm_simulator'
+      - 'POSTGRES_PASSWORD=xK9m2pQ8vR5nF7tA1sD3wE6zY'
+      - 'POSTGRES_USER=hsm_user'
+    ports:
+      - '5432:5432'
+    volumes:
+      - ./db-hsm:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hsm_user"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
