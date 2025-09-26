@@ -93,16 +93,16 @@ graph TB
     subgraph "Phase 3: Generation"
         M --> N{All 3 Contributions?}
         N -->|Yes| O[Generate Master Key]
-        N -->|No| P[Wait for Remaining<br/>Contributions]
+        N -->|No| P[Wait for Remaining Contributions]
         P --> M
 
-        O --> Q[Generate Key Shares<br/>2-of-3 Scheme]
+        O --> Q[Generate Key Shares 2-of-3 Scheme]
         Q --> R[Send Key Shares via Email]
         R --> S[Update Ceremony Status]
     end
 
     subgraph "Phase 4: Completion"
-        S --> T[Administrator Verifies<br/>Completion]
+        S --> T[Administrator Verifies Completion]
         T --> U[Generate Documentation]
         U --> V[Ceremony Complete]
     end
@@ -143,7 +143,7 @@ graph LR
     F --> H
     G --> H
 
-    H --> I[Proceed to<br/>Custodian Registration]
+    H --> I[Proceed to Custodian Registration]
 ```
 
 **Form Fields**:
@@ -208,15 +208,15 @@ System akan generate unique contribution links:
 ```mermaid
 graph TB
     subgraph "Link Generation Process"
-        A[System] --> B[Generate Cryptographic<br/>Random Tokens]
+        A[System] --> B[Generate Cryptographic Random Tokens]
         B --> C[Create Unique URLs]
         C --> D[Assign to Custodians]
         D --> E[Set 24-hour Expiration]
     end
 
-    F[Generated Links] --> G[Custodian A:<br/>/contribute/CER-001/A/[token]]
-    F --> H[Custodian B:<br/>/contribute/CER-001/B/[token]]
-    F --> I[Custodian C:<br/>/contribute/CER-001/C/[token]]
+    F[Generated Links] --> G[Custodian A: /contribute/CER-001/A/[token]]
+    F --> H[Custodian B: /contribute/CER-001/B/[token]]
+    F --> I[Custodian C: /contribute/CER-001/C/[token]]
 ```
 
 #### 2.3 Send Email Invitations
@@ -394,18 +394,18 @@ System memberikan real-time feedback:
 ```mermaid
 graph TB
     subgraph "Contribution Collection"
-        A[Custodian A<br/>Contribution] --> D[System]
-        B[Custodian B<br/>Contribution] --> D
-        C[Custodian C<br/>Contribution] --> D
+        A[Custodian A Contribution] --> D[System]
+        B[Custodian B Contribution] --> D
+        C[Custodian C Contribution] --> D
     end
 
     subgraph "Master Key Generation"
-        D --> E{All 3<br/>Contributions?}
+        D --> E{All 3 Contributions?}
         E -->|No| F[Wait Mode]
         E -->|Yes| G[Combine Passphrases]
 
-        G --> H[Hash Combination:<br/>HASH(Cont_A || Cont_B || Cont_C)]
-        H --> I[Key Derivation:<br/>KDF(Combined_Entropy)]
+        G --> H[Hash Combination: HASH(Cont_A || Cont_B || Cont_C)]
+        H --> I[Key Derivation: KDF(Combined_Entropy)]
         I --> J[Master Key Generated]
 
         J --> K[Generate Key ID]
@@ -451,8 +451,8 @@ System update status secara real-time:
 ```mermaid
 graph LR
     subgraph "Key Share Generation"
-        A[Master Key] --> B[Generate Random<br/>Polynomial]
-        B --> C[f(x) = a₀ + a₁x + a₂x²<br/>where a₀ = Master Key]
+        A[Master Key] --> B[Generate Random Polynomial]
+        B --> C[f(x) = a₀ + a₁x + a₂x² where a₀ = Master Key]
         C --> D[Evaluate at x=1,2,3]
         D --> E[Share 1 = f(1)]
         D --> F[Share 2 = f(2)]
@@ -466,7 +466,7 @@ graph LR
     end
 
     subgraph "Recovery Capability"
-        H --> K[Need 2 shares to<br/>recover master key]
+        H --> K[Need 2 shares to recover master key]
         I --> K
         J --> K
     end
@@ -620,10 +620,10 @@ Untuk pembelajaran, system menyediakan educational view:
 ```mermaid
 graph TB
     subgraph "Educational View Components"
-        A[Master Key Components] --> B[Original Master Key<br/>(Hexadecimal)]
-        A --> C[Individual Contributions<br/>(Passphrases)]
-        A --> D[Combined Entropy<br/>(Hash Result)]
-        A --> E[Key Generation Steps<br/>(Mathematical Process)]
+        A[Master Key Components] --> B[Original Master Key (Hexadecimal)]
+        A --> C[Individual Contributions (Passphrases)]
+        A --> D[Combined Entropy (Hash Result)]
+        A --> E[Key Generation Steps (Mathematical Process)]
 
         F[Shamir's Secret Sharing] --> G[Prime Number]
         F --> H[Polynomial Coefficients]
