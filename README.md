@@ -17,33 +17,50 @@ Platform simulasi Hardware Security Module (HSM) yang komprehensif dibangun deng
 
 ⚠️ **Untuk Kepentingan Edukasi**: Aplikasi ini merupakan simulator pembelajaran dan **tidak dimaksudkan untuk penggunaan production**.
 
-## Fitur
+## Quick Start
 
-### 🌐 Antarmuka Web
-- **UI Modern**: Dibangun dengan Tailwind CSS 4.1 untuk desain responsif
-- **Sistem Layout**: Thymeleaf Layout Dialect untuk struktur halaman yang konsisten
-- **Dashboard**: Ringkasan operasi dan statistik HSM
-- **Navigasi Fitur**: Navigasi sidebar untuk operasi HSM yang berbeda
-- **Informasi Versi**: Tampilan real-time git commit ID, branch, dan versi aplikasi
-- **Kredit Artivisi**: Branding profesional dan atribusi perusahaan
+### 1. Clone & Setup
+```bash
+git clone <repository-url>
+cd hsm-simulator
+docker-compose up -d postgres
+```
 
-### 🔑 Manajemen Kunci
-- Hasilkan, impor, ekspor, dan kelola kunci kriptografi
-- Dukungan untuk berbagai algoritma dan ukuran kunci
-- Penyimpanan kunci aman dengan enkripsi
-- Rotasi kunci dan manajemen siklus hidup
+### 2. Build & Run
+```bash
+mvn clean install
+mvn spring-boot:run
+```
+
+### 3. Access Application
+Buka browser: `http://localhost:8080`
+
+## Fitur Utama
+
+### 🏗️ Platform Lengkap
+- **Simulator HSM**: Platform simulasi Hardware Security Module yang komprehensif
+- **Antarmuka Web Modern**: UI responsif dengan Tailwind CSS dan Thymeleaf Layout Dialect
+- **Dashboard Interaktif**: Ringkasan operasi, statistik, dan monitoring real-time
+- **Navigasi Intuitif**: Sidebar menu untuk akses cepat ke semua fitur HSM
 
 ### 🔐 Operasi Kriptografi
-- Enkripsi dan dekripsi (3DES, AES)
-- Pembuatan dan verifikasi PIN block
-- Pembuatan dan verifikasi tanda tangan digital
-- Operasi Message Authentication Code (MAC)
+- **Manajemen Kunci**: Generate, import, export, dan rotasi kunci kriptografi
+- **PIN Operations**: Pembuatan, verifikasi, dan translation PIN block (ISO-0, ISO-1, ISO-2, ISO-3)
+- **Enkripsi/Dekripsi**: Support 3DES, AES untuk data transaksi
+- **Digital Signature**: Pembuatan dan verifikasi tanda tangan digital
+- **MAC Operations**: Message Authentication Code untuk integritas data
 
-### 📊 Pemantauan & Analitik
-- Statistik operasi real-time
-- Logging transaksi dan audit trail
-- Metrik kinerja dan pemantauan
-- Indikator status kesehatan
+### 🌐 Arsitektur Perbankan
+- **Multi-Zone Support**: Manajemen kunci untuk Acquirer, Issuer, dan Switch
+- **PIN Translation**: Konversi PIN antar zona dengan keamanan end-to-end
+- **Key Ceremony**: Inisialisasi master key dengan threshold scheme (2-of-3)
+- **Terminal Integration**: Komunikasi aman bank-terminal dengan TMK/TSK
+
+### 📊 Monitoring & Keamanan
+- **Audit Trail**: Logging lengkap untuk semua operasi kriptografi
+- **Real-time Statistics**: Monitoring kinerja dan status kesehatan sistem
+- **Security Controls**: Validasi, authentication, dan authorization
+- **Educational Mode**: Visualisasi operasi kriptografi untuk pembelajaran
 
 ## Arsitektur Sistem Perbankan dengan HSM
 
@@ -279,25 +296,31 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 
 Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan dengan memanfaatkan HSM untuk semua operasi kriptografi kritis.
 
-## Dokumentasi Penggunaan dan Pengujian
+---
+
+## 📚 Dokumentasi Penggunaan dan Pengujian
+
+Dokumentasi berikut diurutkan berdasarkan alur implementasi dari setup awal hingga operasi transaksi:
 
 ### 📚 User Manual
 Dokumentasi lengkap untuk penggunaan HSM Simulator:
 
 | Manual | Deskripsi | Link |
 |--------|-----------|------|
-| **PIN Block Operations** | Panduan lengkap operasi PIN block dengan format ISO-0, ISO-1, ISO-2, dan ISO-3. Termasuk enkripsi, dekripsi, dan verifikasi PIN block untuk transaksi perbankan. | [docs/user-manual/pinblock.md](docs/user-manual/pinblock.md) |
 | **Key Ceremony** | Prosedur lengkap inisialisasi dan pemulihan master key HSM menggunakan mekanisme 2-of-3 threshold scheme dengan Shamir's Secret Sharing. | [docs/user-manual/key-ceremony.md](docs/user-manual/key-ceremony.md) |
 | **Terminal Key Management** | Panduan pengelolaan kunci terminal termasuk TMK (Terminal Master Key) dan TSK (Terminal Security Key) untuk komunikasi aman bank-terminal. | [docs/user-manual/terminal-key.md](docs/user-manual/terminal-key.md) |
+| **Zone Key Management** | Panduan lengkap pengelolaan Zone Master Key (ZMK) dan Zone PIN Key (ZPK) untuk komunikasi antar bank dalam ekosistem perbankan. Termasuk PIN Translation dan implementasi keamanan transaksi lintas zona. | [docs/user-manual/zone-key.md](docs/user-manual/zone-key.md) |
+| **PIN Block Operations** | Panduan lengkap operasi PIN block dengan format ISO-0, ISO-1, ISO-2, dan ISO-3. Termasuk enkripsi, dekripsi, dan verifikasi PIN block untuk transaksi perbankan. | [docs/user-manual/pinblock.md](docs/user-manual/pinblock.md) |
 
 ### 🧪 Test Scenario
 Skenario pengujian untuk memvalidasi fitur-fitur HSM Simulator:
 
 | Skenario | Deskripsi | Link |
 |----------|-----------|------|
-| **PIN Block Testing** | Skenario pengujian komprehensif untuk operasi PIN block termasuk format validation, encryption/decryption, dan edge case testing. | [docs/test-scenario/pinblock.md](docs/test-scenario/pinblock.md) |
 | **Key Ceremony Testing** | Skenario pengujian key ceremony dengan simulasi 3 custodian dan threshold 2-of-3. Termasuk inisialisasi dan pemulihan master key. | [docs/test-scenario/key-ceremony.md](docs/test-scenario/key-ceremony.md) |
 | **Terminal Keys Testing** | Skenario pengujian manajemen kunci terminal untuk validasi keamanan komunikasi antara terminal dan HSM bank. | [docs/test-scenario/terminal-keys.md](docs/test-scenario/terminal-keys.md) |
+| **Zone Key Testing** | Skenario pengujian komprehensif untuk Zone Key Management termasuk zone master key generation, PIN key derivation, PIN translation antar zone, dan end-to-end PIN verification dengan debug capabilities. | [docs/test-scenario/zone-key.md](docs/test-scenario/zone-key.md) |
+| **PIN Block Testing** | Skenario pengujian komprehensif untuk operasi PIN block termasuk format validation, encryption/decryption, dan edge case testing. | [docs/test-scenario/pinblock.md](docs/test-scenario/pinblock.md) |
 
 ### 🔍 Fitur Dokumentasi
 
@@ -331,9 +354,17 @@ Skenario pengujian untuk memvalidasi fitur-fitur HSM Simulator:
 - **Testing**: TestContainer, JUnit 5, dan Playwright untuk E2E testing
 - **Build**: Maven dengan frontend-maven-plugin
 
-## Prasyarat
+## Teknologi & Prasyarat
 
-### Kebutuhan Perangkat Lunak
+### Stack Teknologi
+- **Backend**: Spring Boot 3.5.6 dengan Java 21
+- **Frontend**: Thymeleaf dengan Layout Dialect
+- **Styling**: Tailwind CSS 4.1
+- **Database**: PostgreSQL 17 dengan Flyway migrations
+- **Testing**: TestContainer, JUnit 5, dan Playwright untuk E2E testing
+- **Build**: Maven dengan frontend-maven-plugin
+
+### Prasyarat Sistem
 - Java 21+
 - Maven 3.8+
 - Node.js 24+ (untuk build Tailwind CSS)
@@ -347,39 +378,7 @@ Skenario pengujian untuk memvalidasi fitur-fitur HSM Simulator:
 - Pemahaman dasar konsep kriptografi
 - Pengembangan web dengan HTML/CSS
 
-## Instruksi Build dan Run
-
-### 1. Clone Repository
-```bash
-git clone <repository-url>
-cd hsm-simulator
-```
-
-### 2. Setup Database
-```bash
-docker-compose up -d postgres
-```
-
-### 3. Build Project (termasuk kompilasi Tailwind CSS)
-```bash
-mvn clean install
-```
-
-Ini akan:
-- Install dependensi Tailwind CSS 4.1
-- Kompilasi file CSS menggunakan instalasi Node.js yang ada
-- Build aplikasi Spring Boot
-- Jalankan semua tes termasuk Playwright E2E tests
-
-### 4. Run Application
-```bash
-mvn spring-boot:run
-```
-
-### 5. Akses Aplikasi
-Buka browser dan navigasi ke: `http://localhost:8080`
-
-## Setup Development
+## 💻 Development Setup
 
 ### Frontend Development (Tailwind CSS)
 
@@ -486,27 +485,6 @@ Proyek menggunakan TestContainer untuk database testing dan Playwright untuk end
 - **PostgreSQL TestContainer**: Secara otomatis memulai instance PostgreSQL terisolasi untuk setiap test run
 - **Playwright**: Menyediakan E2E testing dengan page object pattern untuk validasi web interface
 - **Spring Boot Test**: Full integration testing dengan application context loading
-
-## Ringkasan Fitur
-
-### Fitur Web Interface
-- **Header**: Judul aplikasi, pesan selamat datang, dan ikon pengaturan
-- **Sidebar**: Menu navigasi untuk fitur berbeda (Manajemen Kunci, Enkripsi, dll.)
-- **Main Content**:
-  - Bagian selamat datang dengan pengenalan aplikasi
-  - Tombol Quick Actions untuk operasi umum (Generate Key, Import Key, Export Key, Settings)
-  - Kartu statistik menunjukkan jumlah kunci, operasi, sertifikat, dan tingkat keberhasilan
-  - Kartu fitur yang menjelaskan kemampuan HSM yang tersedia
-- **Footer**: Informasi hak cipta, kredit Artivisi dengan logo, dan informasi versi/git
-
-### Fitur Tersedia (melalui navigasi sidebar)
-- Manajemen Kunci
-- Enkripsi/Dekripsi
-- Tanda Tangan Digital
-- Manajemen Sertifikat
-- Log Transaksi
-- Statistik
-- Pengaturan
 
 ## Troubleshooting
 
