@@ -2,46 +2,46 @@
 
 <div align="center">
 
-**Developed with assistance from AI coding assistants**
+**Dikembangkan dengan bantuan asisten coding AI**
 
 [![GLM-4.5 by Z.ai](https://img.shields.io/badge/Powered%20by-GLM--4.5%20by%20Z.ai-blue?style=for-the-badge&logo=ai&logoColor=white)](https://z.ai)
 [![Claude Code](https://img.shields.io/badge/Coded%20with-Claude%20Code-orange?style=for-the-badge&logo=anthropic&logoColor=white)](https://claude.ai/code)
 
-*This project was developed with the assistance of GLM-4.5 by Z.ai and Claude Code as AI coding assistants*
+*Proyek ini dikembangkan dengan bantuan GLM-4.5 oleh Z.ai dan Claude Code sebagai asisten coding AI*
 
 </div>
 
-## Description
+## Deskripsi
 
-A comprehensive Hardware Security Module (HSM) simulation platform built with Spring Boot, featuring a modern web interface with Tailwind CSS and Thymeleaf Layout Dialect. This simulator provides a web-based interface for exploring HSM capabilities and cryptographic operations.
+Platform simulasi Hardware Security Module (HSM) yang komprehensif dibangun dengan Spring Boot, dilengkapi antarmuka web modern dengan Tailwind CSS dan Thymeleaf Layout Dialect. Simulator ini menyediakan antarmuka berbasis web untuk mengeksplorasi kemampuan HSM dan operasi kriptografi.
 
-## Features
+## Fitur
 
-### 🌐 Web Interface
-- **Modern UI**: Built with Tailwind CSS 4.1 for responsive design
-- **Layout System**: Thymeleaf Layout Dialect for consistent page structure
-- **Dashboard**: Overview of HSM operations and statistics
-- **Feature Navigation**: Sidebar navigation for different HSM operations
-- **Version Information**: Real-time display of git commit ID, branch, and application version
-- **Artivisi Credit**: Professional branding and company attribution
+### 🌐 Antarmuka Web
+- **UI Modern**: Dibangun dengan Tailwind CSS 4.1 untuk desain responsif
+- **Sistem Layout**: Thymeleaf Layout Dialect untuk struktur halaman yang konsisten
+- **Dashboard**: Ringkasan operasi dan statistik HSM
+- **Navigasi Fitur**: Navigasi sidebar untuk operasi HSM yang berbeda
+- **Informasi Versi**: Tampilan real-time git commit ID, branch, dan versi aplikasi
+- **Kredit Artivisi**: Branding profesional dan atribusi perusahaan
 
-### 🔑 Key Management
-- Generate, import, export, and manage cryptographic keys
-- Support for various algorithms and key sizes
-- Secure key storage with encryption
-- Key rotation and lifecycle management
+### 🔑 Manajemen Kunci
+- Hasilkan, impor, ekspor, dan kelola kunci kriptografi
+- Dukungan untuk berbagai algoritma dan ukuran kunci
+- Penyimpanan kunci aman dengan enkripsi
+- Rotasi kunci dan manajemen siklus hidup
 
-### 🔐 Cryptographic Operations
-- Encryption and decryption (3DES, AES)
-- PIN block generation and verification
-- Digital signature creation and verification
-- Message Authentication Code (MAC) operations
+### 🔐 Operasi Kriptografi
+- Enkripsi dan dekripsi (3DES, AES)
+- Pembuatan dan verifikasi PIN block
+- Pembuatan dan verifikasi tanda tangan digital
+- Operasi Message Authentication Code (MAC)
 
-### 📊 Monitoring & Analytics
-- Real-time operation statistics
-- Transaction logging and audit trail
-- Performance metrics and monitoring
-- Health status indicators
+### 📊 Pemantauan & Analitik
+- Statistik operasi real-time
+- Logging transaksi dan audit trail
+- Metrik kinerja dan pemantauan
+- Indikator status kesehatan
 
 ## Arsitektur Sistem Perbankan dengan HSM
 
@@ -81,7 +81,7 @@ graph TB
     end
 
     subgraph "Key Management"
-        KMS[Key Management System<br/>ZMK/ZPK Generator]
+        KMS[Key Management System<br/>ZMK Generator]
     end
 
     %% Connections between banks
@@ -129,28 +129,32 @@ sequenceDiagram
     Note over C,BB_HSM: Transaction Flow with Key Management
 
     C->>T: Insert Card & Enter PIN
-    T->>AB_HSM: Encrypt PIN with TMK
-    AB_HSM->>AB: Return encrypted PIN block
-    AB->>NW: Send transaction request<br/>(with encrypted PIN)
+    T->>T: Generate PIN Block (ISO format)
+    T->>AB_HSM: Encrypt PIN Block with TMK
+    AB_HSM->>AB: Return encrypted PIN Block
+    AB->>NW: Send transaction request<br/>(with encrypted PIN Block)
 
     NW->>IB: Forward transaction
-    IB->>IB_HSM: Decrypt PIN with TMK
-    IB_HSM->>IB: Return decrypted PIN
-
+    IB->>IB_HSM: Verify encrypted PIN Block
     Note over IB,IB_HSM: Authorization Process
-    IB->>IB_HSM: Verify PIN
-    IB_HSM->>IB: PIN verification result
+    IB_HSM->>IB_HSM: Decrypt PIN Block with TMK
+    IB_HSM->>IB_HSM: Verify PIN against customer data
+    IB_HSM->>IB: Return verification result (approve/reject)
     IB->>NW: Authorization response
 
     NW->>AB: Forward response
     AB->>T: Display transaction result
     T->>C: Show result & receipt
 
-    Note over AB,BB_HSM: Settlement Process
-    AB->>BB: Settlement request<br/>(encrypted with ZPK)
-    BB->>BB_HSM: Decrypt with ZPK
+    Note over AB,BB_HSM: Settlement Process (for fund transfers)
+    AB->>AB_HSM: Generate settlement request
+    AB_HSM->>AB_HSM: Encrypt with ZSK
+    AB->>BB: Settlement request<br/>(encrypted with ZSK)
+    BB->>BB_HSM: Decrypt settlement data with ZSK
     BB_HSM->>BB: Process settlement
-    BB->>AB: Settlement confirmation
+    BB->>BB_HSM: Generate confirmation
+    BB_HSM->>BB_HSM: Encrypt with ZSK
+    BB->>AB: Settlement confirmation<br/>(encrypted with ZSK)
 ```
 
 ### Penjelasan Arsitektur
@@ -170,8 +174,10 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 
 2. **Inter-Bank Connection**:
    - Semua bank terhubung melalui Payment Network (SWITCH/VISA/MASTERCARD)
-   - Komunikasi antar bank dienkripsi menggunakan ZMK (Zone Master Key)
-   - Settlement antar bank menggunakan ZPK (Zone PIN Key)
+   - Komunikasi antar bank menggunakan kombinasi ZMK, ZPK, dan ZSK:
+     - **ZMK (Zone Master Key)**: Mengenkripsi kunci-kunci yang dikirim antar bank
+     - **ZPK (Zone PIN Key)**: Mengenkripsi PIN-related data antar bank
+     - **ZSK (Zone Session Key)**: Mengenkripsi data transaksi antar bank
 
 3. **Key Management System**:
    - Sentral untuk menghasilkan dan mendistribusikan kunci ke semua HSM
@@ -216,26 +222,36 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 - **Distribusi**: Didistribusikan bersama TMK
 
 #### 3. ZMK (Zone Master Key)
-- **Fungsi**: Kunci master untuk komunikasi antar bank
+- **Fungsi**: Kunci master untuk mengamankan distribusi kunci antar bank
 - **Penggunaan**:
-  - Mengenkripsi data sensitif antar bank
-  - Mengamankan komunikasi di payment network
+  - Mengenkripsi kunci-kunci (ZPK, ZSK) saat dikirim antar bank
+  - Key exchange protocol antar bank
 - **Distribusi**: Diatur oleh payment network atau KMS sentral
 
 #### 4. ZPK (Zone PIN Key)
-- **Fungsi**: Kunci khusus untuk PIN dalam komunikasi antar bank
+- **Fungsi**: Kunci khusus untuk PIN-related data dalam komunikasi antar bank
 - **Penggunaan**:
-  - Mengenkripsi PIN saat transfer antar bank
-  - Melindungi PIN selama proses settlement
-- **Distribusi**: Dikelola oleh KMS dengan prosedur keamanan ketat
+  - Mengenkripsi PIN block saat transfer antar bank
+  - Melindungi PIN data selama proses inter-bank
+- **Distribusi**: Dikirim antar bank dengan enkripsi ZMK
+
+#### 5. ZSK (Zone Session Key)
+- **Fungsi**: Kunci sesi untuk mengenkripsi data transaksi antar bank
+- **Penggunaan**:
+  - Mengenkripsi data transaksi non-PIN antar bank
+  - Mengamankan settlement dan clearing data
+- **Distribusi**: Dibuat per sesi transaksi dan dienkripsi dengan ZMK
 
 ### Alur Keamanan Transaksi
 
-1. **PIN Entry**: PIN dienkripsi di terminal menggunakan TMK
-2. **Authorization**: PIN didekripsi di HSM issuer bank untuk verifikasi
-3. **Inter-bank Communication**: Data sensitif dienkripsi dengan ZMK
-4. **Settlement**: PIN untuk transfer antar bank dienkripsi dengan ZPK
-5. **Key Rotation**: Semua kunci dirotasi secara berkala untuk keamanan
+1. **PIN Entry**: PIN dikonversi menjadi PIN Block di terminal, kemudian dienkripsi dengan TMK
+2. **Authorization**: PIN Block diverifikasi di HSM issuer bank tanpa mengembalikan PIN plaintext
+3. **Key Exchange**: ZPK dan ZSK didistribusikan antar bank dengan enkripsi ZMK
+4. **Inter-bank PIN Data**: PIN-related data antar bank dienkripsi dengan ZPK
+5. **Inter-bank Transaction Data**: Data transaksi antar bank dienkripsi dengan ZSK
+6. **Settlement**: Data settlement dienkripsi dengan ZSK untuk transfer dana antar bank
+7. **Key Rotation**: Semua kunci dirotasi secara berkala untuk keamanan
+8. **PIN Security**: PIN tidak pernah dikirim dalam bentuk plaintext antar sistem
 
 Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan dengan memanfaatkan HSM untuk semua operasi kriptografi kritis.
 
@@ -280,34 +296,34 @@ Skenario pengujian untuk memvalidasi fitur-fitur HSM Simulator:
 1. **Untuk Pembelajaran**: Mulai dari User Manual untuk memahami konsep dan cara penggunaan
 2. **Untuk Pengujian**: Gunakan Test Scenario untuk memvalidasi implementasi
 3. **Untuk Development**: Referensi dokumentasi saat mengembangkan fitur baru
-4. **Untuk Troubleshooting**: Gunakan test scenario untuk debugging dan issue resolution
+4. **Untuk Troubleshooting**: Gunakan test scenario untuk debugging dan resolusi masalah
 
-## Technology Stack
+## Teknologi yang Digunakan
 
-- **Backend**: Spring Boot 3.5.6 with Java 21
-- **Frontend**: Thymeleaf with Layout Dialect
+- **Backend**: Spring Boot 3.5.6 dengan Java 21
+- **Frontend**: Thymeleaf dengan Layout Dialect
 - **Styling**: Tailwind CSS 4.1
-- **Database**: PostgreSQL 17 with Flyway migrations
-- **Testing**: TestContainer, JUnit 5, and Playwright for E2E testing
-- **Build**: Maven with frontend-maven-plugin
+- **Database**: PostgreSQL 17 dengan Flyway migrations
+- **Testing**: TestContainer, JUnit 5, dan Playwright untuk E2E testing
+- **Build**: Maven dengan frontend-maven-plugin
 
-## Prerequisites
+## Prasyarat
 
-### Software Requirements
+### Kebutuhan Perangkat Lunak
 - Java 21+
 - Maven 3.8+
-- Node.js 24+ (for Tailwind CSS build)
-- Docker & Docker Compose (for PostgreSQL and testing)
+- Node.js 24+ (untuk build Tailwind CSS)
+- Docker & Docker Compose (untuk PostgreSQL dan testing)
 - PostgreSQL 17
 
-### Knowledge Requirements
-- Java Spring Boot framework
-- REST API development
-- Database operations
-- Basic understanding of cryptography concepts
-- Web development with HTML/CSS
+### Kebutuhan Pengetahuan
+- Framework Java Spring Boot
+- Pengembangan REST API
+- Operasi database
+- Pemahaman dasar konsep kriptografi
+- Pengembangan web dengan HTML/CSS
 
-## Build and Run Instructions
+## Instruksi Build dan Run
 
 ### 1. Clone Repository
 ```bash
@@ -320,49 +336,49 @@ cd hsm-simulator
 docker-compose up -d postgres
 ```
 
-### 3. Build Project (includes Tailwind CSS compilation)
+### 3. Build Project (termasuk kompilasi Tailwind CSS)
 ```bash
 mvn clean install
 ```
 
-This will:
-- Install Tailwind CSS 4.1 dependencies
-- Compile CSS files using your existing Node.js installation
-- Build the Spring Boot application
-- Run all tests including Playwright E2E tests
+Ini akan:
+- Install dependensi Tailwind CSS 4.1
+- Kompilasi file CSS menggunakan instalasi Node.js yang ada
+- Build aplikasi Spring Boot
+- Jalankan semua tes termasuk Playwright E2E tests
 
 ### 4. Run Application
 ```bash
 mvn spring-boot:run
 ```
 
-### 5. Access the Application
-Open your browser and navigate to: `http://localhost:8080`
+### 5. Akses Aplikasi
+Buka browser dan navigasi ke: `http://localhost:8080`
 
-## Development Setup
+## Setup Development
 
 ### Frontend Development (Tailwind CSS)
 
-For development with hot reload:
+Untuk development dengan hot reload:
 ```bash
 # Install dependencies
 npm install
 
-# Start Tailwind CSS in watch mode (auto-compiles on changes)
+# Start Tailwind CSS dalam mode watch (auto-kompilasi saat ada perubahan)
 npm run build
 ```
 
-For production build:
+Untuk production build:
 ```bash
 npm run build-prod
 ```
 
-### Database Management
+### Manajemen Database
 ```bash
 # Start PostgreSQL
 docker-compose up -d postgres
 
-# View database logs
+# Lihat database logs
 docker-compose logs postgres
 
 # Stop database
@@ -371,17 +387,17 @@ docker-compose down
 
 ### Testing
 
-Run all tests including E2E tests:
+Jalankan semua tes termasuk E2E tests:
 ```bash
 mvn test
 ```
 
-Run only Playwright tests:
+Jalankan hanya Playwright tests:
 ```bash
 mvn test -Dtest=HomePageTest
 ```
 
-Run a specific test:
+Jalankan tes spesifik:
 ```bash
 mvn test -Dtest=HomePageTest#shouldLoadHomepageWithCorrectTitle
 ```
@@ -424,70 +440,70 @@ hsm-simulator/
     └── migrations/
 ```
 
-## Configuration
+## Konfigurasi
 
-### Application Configuration
-The main configuration is in `src/main/resources/application.yml`.
+### Konfigurasi Aplikasi
+Konfigurasi utama ada di `src/main/resources/application.yml`.
 
-### Tailwind CSS Configuration
-- `tailwind.config.js`: Tailwind configuration with content paths
-- `src/main/resources/static/css/input.css`: Source CSS with Tailwind directives
-- `src/main/resources/static/css/output.css`: Compiled CSS (auto-generated)
+### Konfigurasi Tailwind CSS
+- `tailwind.config.js`: Konfigurasi Tailwind dengan content paths
+- `src/main/resources/static/css/input.css`: Source CSS dengan Tailwind directives
+- `src/main/resources/static/css/output.css`: CSS yang terkompilasi (auto-generated)
 
-### Database Configuration
-The application uses PostgreSQL with Flyway for database migrations. Configuration is managed through Spring Boot auto-configuration.
+### Konfigurasi Database
+Aplikasi menggunakan PostgreSQL dengan Flyway untuk database migrations. Konfigurasi dikelola melalui Spring Boot auto-configuration.
 
-### Testing Configuration
-The project uses TestContainer for database testing and Playwright for end-to-end web testing:
-- **PostgreSQL TestContainer**: Automatically starts isolated PostgreSQL instances for each test run
-- **Playwright**: Provides E2E testing with page object pattern for web interface validation
-- **Spring Boot Test**: Full integration testing with application context loading
+### Konfigurasi Testing
+Proyek menggunakan TestContainer untuk database testing dan Playwright untuk end-to-end web testing:
+- **PostgreSQL TestContainer**: Secara otomatis memulai instance PostgreSQL terisolasi untuk setiap test run
+- **Playwright**: Menyediakan E2E testing dengan page object pattern untuk validasi web interface
+- **Spring Boot Test**: Full integration testing dengan application context loading
 
-## Features Overview
+## Ringkasan Fitur
 
-### Web Interface Features
-- **Header**: Application title, welcome message, and settings icon
-- **Sidebar**: Navigation menu for different features (Key Management, Encryption, etc.)
+### Fitur Web Interface
+- **Header**: Judul aplikasi, pesan selamat datang, dan ikon pengaturan
+- **Sidebar**: Menu navigasi untuk fitur berbeda (Manajemen Kunci, Enkripsi, dll.)
 - **Main Content**:
-  - Welcome section with app introduction
-  - Quick Actions buttons for common operations (Generate Key, Import Key, Export Key, Settings)
-  - Statistics cards showing key counts, operations, certificates, and success rates
-  - Feature cards describing available HSM capabilities
-- **Footer**: Copyright information, Artivisi credit with logo, and version/git information
+  - Bagian selamat datang dengan pengenalan aplikasi
+  - Tombol Quick Actions untuk operasi umum (Generate Key, Import Key, Export Key, Settings)
+  - Kartu statistik menunjukkan jumlah kunci, operasi, sertifikat, dan tingkat keberhasilan
+  - Kartu fitur yang menjelaskan kemampuan HSM yang tersedia
+- **Footer**: Informasi hak cipta, kredit Artivisi dengan logo, dan informasi versi/git
 
-### Available Features (via sidebar navigation)
-- Key Management
-- Encryption/Decryption
-- Digital Signature
-- Certificate Management
-- Transaction Log
-- Statistics
-- Settings
+### Fitur Tersedia (melalui navigasi sidebar)
+- Manajemen Kunci
+- Enkripsi/Dekripsi
+- Tanda Tangan Digital
+- Manajemen Sertifikat
+- Log Transaksi
+- Statistik
+- Pengaturan
 
 ## Troubleshooting
 
-### Common Issues
+### Masalah Umum
 
-1. **Port 8080 already in use**
+1. **Port 8080 sudah digunakan**
    ```bash
-   # Find process using port 8080
+   # Cari proses yang menggunakan port 8080
    lsof -i :8080
 
-   # Kill the process or change application port in application.yml
+   # Hentikan proses atau ubah port aplikasi di application.yml
    ```
 
-2. **Database connection issues**
+2. **Masalah koneksi database**
    ```bash
-   # Check PostgreSQL status
+   # Periksa status PostgreSQL
    docker-compose ps
 
    # Restart PostgreSQL
    docker-compose restart postgres
    ```
 
-3. **Tailwind CSS not compiling**
+3. **Tailwind CSS tidak terkompilasi**
    ```bash
-   # Clean and rebuild
+   # Clean dan rebuild
    mvn clean install
 
    # Manual npm install
@@ -495,48 +511,48 @@ The project uses TestContainer for database testing and Playwright for end-to-en
    npm run build
    ```
 
-4. **Frontend changes not visible**
-   - Ensure Tailwind CSS is running in watch mode (`npm run build`)
-   - Check browser cache (hard refresh: Ctrl+Shift+R)
-   - Verify CSS compilation in `target/classes/static/css/output.css`
+4. **Perubahan frontend tidak terlihat**
+   - Pastikan Tailwind CSS berjalan dalam mode watch (`npm run build`)
+   - Periksa cache browser (hard refresh: Ctrl+Shift+R)
+   - Verifikasi kompilasi CSS di `target/classes/static/css/output.css`
 
-### Debug Tips
-- Check application logs in console
-- Verify database connectivity
-- Ensure all dependencies are installed correctly
-- Test Tailwind CSS compilation separately
+### Tips Debug
+- Periksa aplikasi logs di console
+- Verifikasi konektivitas database
+- Pastikan semua dependensi terinstall dengan benar
+- Test kompilasi Tailwind CSS secara terpisah
 
-## Learning Objectives
+## Tujuan Pembelajaran
 
-This project demonstrates:
-- Modern Spring Boot application structure
-- Integration of frontend technologies (Tailwind CSS, Thymeleaf)
-- Database design with Flyway migrations
-- Testing with TestContainer and Playwright
-- Build automation with Maven and frontend tools
+Proyek ini mendemonstrasikan:
+- Struktur aplikasi Spring Boot modern
+- Integrasi teknologi frontend (Tailwind CSS, Thymeleaf)
+- Desain database dengan Flyway migrations
+- Testing dengan TestContainer dan Playwright
+- Otomasi build dengan Maven dan tools frontend
 
-## Contributing
+## Kontribusi
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+1. Fork repository
+2. Buat feature branch
+3. Buat perubahan Anda
+4. Test secara menyeluruh
+5. Submit pull request
 
-## License
+## Lisensi
 
-MIT License - see LICENSE file for details
+MIT License - lihat file LICENSE untuk detail
 
-## Support
+## Dukungan
 
-For questions or support:
-- Create an issue in the GitHub repository
-- Check the project documentation
-- Review the codebase and examples
+Untuk pertanyaan atau dukungan:
+- Buat issue di GitHub repository
+- Periksa dokumentasi proyek
+- Review codebase dan contoh
 
 ---
 
-## AI Development Assistance
+## Bantuan Pengembangan AI
 
 <div align="center">
 
@@ -545,14 +561,14 @@ For questions or support:
 
 </div>
 
-This project was developed with the assistance of **GLM-4.5 by Z.ai** and **Claude Code by Anthropic** as AI coding assistants.
+Proyek ini dikembangkan dengan bantuan **GLM-4.5 oleh Z.ai** dan **Claude Code oleh Anthropic** sebagai asisten coding AI.
 
-**Project Highlights:**
-- 🏗️ Complete Spring Boot application with modern web interface
-- 🎨 Tailwind CSS 4.1 integration with automated build process
-- 📱 Responsive design with Thymeleaf Layout Dialect
-- 🗄️ PostgreSQL database with Flyway migrations
-- 🧪 Comprehensive testing setup with TestContainer and Playwright
-- 🚀 Production-ready build configuration
+**Highlight Proyek:**
+- 🏗️ Aplikasi Spring Boot lengkap dengan antarmuka web modern
+- 🎨 Integrasi Tailwind CSS 4.1 dengan proses build otomatis
+- 📱 Desain responsif dengan Thymeleaf Layout Dialect
+- 🗄️ Database PostgreSQL dengan Flyway migrations
+- 🧪 Setup testing komprehensif dengan TestContainer dan Playwright
+- 🚀 Konfigurasi build siap produksi
 
-All AI-generated code has been reviewed, tested, and validated for production use.
+Semua kode yang dihasilkan AI telah ditinjau, diuji, dan divalidasi untuk penggunaan produksi.
