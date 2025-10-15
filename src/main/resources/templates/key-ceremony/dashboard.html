@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+
+<head>
+    <title>Key Ceremony Dashboard</title>
+</head>
+
+<body>
+<div layout:fragment="content">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <h1 class="text-3xl font-bold text-gray-900 mb-2">
+            <i class="fas fa-user-shield mr-3 text-blue-600"></i>
+            Key Ceremony Management
+        </h1>
+        <p class="text-gray-600">Manage HSM master key initialization and recovery ceremonies</p>
+    </div>
+
+    <!-- Success/Error Messages -->
+    <div th:if="${success}" class="mb-6 bg-green-50 border border-green-200 rounded-lg p-4">
+        <div class="flex items-center">
+            <i class="fas fa-check-circle text-green-500 mr-3"></i>
+            <p class="text-green-800" th:text="${success}"></p>
+        </div>
+    </div>
+
+    <div th:if="${error}" class="mb-6 bg-red-50 border border-red-200 rounded-lg p-4">
+        <div class="flex items-center">
+            <i class="fas fa-exclamation-circle text-red-500 mr-3"></i>
+            <p class="text-red-800" th:text="${error}"></p>
+        </div>
+    </div>
+
+    <!-- Master Key Status Card -->
+    <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">
+            <i class="fas fa-shield-alt mr-2 text-green-600"></i>
+            Master Key Status
+        </h2>
+
+        <div th:if="${hasActiveMasterKey}" class="space-y-4">
+            <div class="flex items-center justify-between p-4 bg-green-50 rounded-lg">
+                <div>
+                    <h3 class="text-lg font-medium text-green-900">Active Master Key Found</h3>
+                    <p class="text-green-700" th:text="'Key ID: ' + ${activeMasterKey.masterKeyId}"></p>
+                    <p class="text-green-700" th:text="'Algorithm: ' + ${activeMasterKey.algorithm} + '-' + ${activeMasterKey.keySize}"></p>
+                    <p class="text-green-700" th:text="'Generated: ' + ${#temporals.format(activeMasterKey.generatedAt, 'yyyy-MM-dd HH:mm:ss')}"></p>
+                </div>
+                <div class="text-green-600">
+                    <i class="fas fa-check-circle text-4xl"></i>
+                </div>
+            </div>
+        </div>
+
+        <div th:unless="${hasActiveMasterKey}" class="space-y-4">
+            <div class="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
+                <div>
+                    <h3 class="text-lg font-medium text-yellow-900">No Active Master Key</h3>
+                    <p class="text-yellow-700">The HSM system needs a master key to operate securely.</p>
+                </div>
+                <div class="text-yellow-600">
+                    <i class="fas fa-exclamation-triangle text-4xl"></i>
+                </div>
+            </div>
+
+            <div th:if="${shouldInitiate}" class="mt-4">
+                <a href="/key-ceremony/new"
+                   class="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors">
+                    <i class="fas fa-plus-circle mr-2"></i>
+                    Start New Key Ceremony
+                </a>
+            </div>
+
+            <div th:unless="${shouldInitiate}" class="mt-4 p-4 bg-gray-50 rounded-lg">
+                <p class="text-gray-700">
+                    <i class="fas fa-info-circle mr-2"></i>
+                    Cannot initiate key ceremony: Need at least 3 active custodians.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Ceremonies -->
+    <div class="bg-white rounded-lg shadow-md p-6">
+        <h2 class="text-xl font-semibold text-gray-900 mb-4">
+            <i class="fas fa-tasks mr-2 text-blue-600"></i>
+            Active Ceremonies
+        </h2>
+
+        <div th:if="${activeCeremonies.empty}" class="text-center py-8 text-gray-500">
+            <i class="fas fa-inbox text-4xl mb-4"></i>
+            <p>No active ceremonies found.</p>
+            <p class="text-sm mt-2">Start a new key ceremony to begin the master key initialization process.</p>
+        </div>
+
+        <div th:unless="${activeCeremonies.empty}" class="space-y-4">
+            <div th:each="ceremony : ${activeCeremonies}"
+                 class="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-lg font-medium text-gray-900" th:text="${ceremony.ceremonyName}"></h3>
+                        <p class="text-sm text-gray-600">
+                            ID: <span th:text="${ceremony.ceremonyId}"></span> |
+                            Type: <span th:text="${ceremony.ceremonyType}"></span> |
+                            Status: <span class="px-2 py-1 rounded-full text-xs font-medium"
+                                         th:classappend="${ceremony.status == 'COMPLETED' ? 'bg-green-100 text-green-800' :
+                                                          ceremony.status == 'CANCELLED' ? 'bg-red-100 text-red-800' :
+                                                          'bg-yellow-100 text-yellow-800'}"
+                                         th:text="${ceremony.status}"></span>
+                        </p>
+                        <p class="text-sm text-gray-600">
+                            Started: <span th:text="${#temporals.format(ceremony.startedAt, 'yyyy-MM-dd HH:mm')}"></span>
+                            <span th:if="${ceremony.contributionDeadline}">
+                                | Deadline: <span th:text="${#temporals.format(ceremony.contributionDeadline, 'yyyy-MM-dd HH:mm')}"></span>
+                            </span>
+                        </p>
+                    </div>
+                    <div class="flex space-x-2">
+                        <a th:href="@{/key-ceremony/{ceremonyId}(ceremonyId=${ceremony.ceremonyId})}"
+                           class="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded hover:bg-blue-700 transition-colors">
+                            <i class="fas fa-eye mr-2"></i>
+                            View Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Information Panel -->
+    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-6">
+        <h3 class="text-lg font-semibold text-blue-900 mb-3">
+            <i class="fas fa-info-circle mr-2"></i>
+            About Key Ceremonies
+        </h3>
+        <div class="text-blue-800 space-y-2">
+            <p>
+                <strong>Key Ceremony</strong> is a secure process for generating HSM master keys using
+                a 2-of-3 threshold scheme with Shamir's Secret Sharing.
+            </p>
+            <p>
+                <strong>Process:</strong> Three custodians contribute unique passphrases that are combined
+                to generate the master key. The master key is then split into 3 shares, requiring any 2 shares
+                for recovery.
+            </p>
+            <p class="text-sm">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                This is a simulation for educational purposes. In production environments,
+                key ceremonies must be conducted in secure physical facilities with proper oversight.
+            </p>
+        </div>
+    </div>
+</div>
+</body>
+</html>
