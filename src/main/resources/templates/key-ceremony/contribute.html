@@ -11,7 +11,7 @@
 <div layout:fragment="content">
     <!-- Page Header -->
     <div class="mb-8">
-        <h1 class="text-3xl font-bold text-gray-900 mb-2">
+        <h1 id="contribution-title" class="text-3xl font-bold text-gray-900 mb-2">
             <i class="fas fa-user-shield mr-3 text-blue-600"></i>
             Key Ceremony Contribution
         </h1>
@@ -99,7 +99,7 @@
                     <p class="text-sm text-gray-500">
                         Minimum 16 characters. Mix uppercase, lowercase, numbers, and special characters.
                     </p>
-                    <button type="button"
+                    <button id="password-toggle-button" type="button"
                             onclick="togglePasswordVisibility()"
                             class="text-sm text-blue-600 hover:text-blue-800">
                         <i id="passwordToggle" class="fas fa-eye mr-1"></i>
@@ -145,10 +145,10 @@
             <div class="mb-6">
                 <div class="flex items-start">
                     <input type="checkbox"
-                           id="confirmation"
+                           id="confirmation-checkbox"
                            class="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                            required>
-                    <label for="confirmation" class="ml-2 text-sm text-gray-700">
+                    <label for="confirmation-checkbox" class="ml-2 text-sm text-gray-700">
                         I confirm that this passphrase is unique, secure, and created specifically for this key ceremony.
                         I understand that this contribution will be used to generate the HSM master key.
                     </label>
@@ -158,7 +158,7 @@
             <!-- Submit Button -->
             <div class="flex justify-end">
                 <button type="submit"
-                        id="submitBtn"
+                        id="submit-contribution-button"
                         class="px-6 py-3 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
                         disabled>
                     <i class="fas fa-lock mr-2"></i>
@@ -288,8 +288,8 @@ document.getElementById('passphrase').addEventListener('input', function(e) {
     strengthTextEl.className = 'text-sm font-medium ' + (strength >= 60 ? 'text-green-600' : 'text-red-600');
 
     // Enable/disable submit button
-    const submitBtn = document.getElementById('submitBtn');
-    const confirmation = document.getElementById('confirmation').checked;
+    const submitBtn = document.getElementById('submit-contribution-button');
+    const confirmation = document.getElementById('confirmation-checkbox').checked;
 
     if (strength >= 60 && password.length >= 16 && confirmation) {
         submitBtn.disabled = false;
@@ -309,9 +309,9 @@ function updateRequirementCheck(element, passed) {
 }
 
 // Check confirmation checkbox
-document.getElementById('confirmation').addEventListener('change', function() {
+document.getElementById('confirmation-checkbox').addEventListener('change', function() {
     const password = document.getElementById('passphrase').value;
-    const submitBtn = document.getElementById('submitBtn');
+    const submitBtn = document.getElementById('submit-contribution-button');
 
     if (password.length >= 16 && this.checked) {
         // Trigger password input event to re-evaluate strength

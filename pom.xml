@@ -119,6 +119,14 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Awaitility for testing asynchronous operations -->
+		<dependency>
+			<groupId>org.awaitility</groupId>
+			<artifactId>awaitility</artifactId>
+			<version>4.2.0</version>
+			<scope>test</scope>
+		</dependency>
+
 		<!-- Additional Testing Dependencies -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
