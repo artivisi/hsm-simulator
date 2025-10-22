@@ -1,6 +1,7 @@
 package com.artivisi.hsm.simulator.repository;
 
 import com.artivisi.hsm.simulator.entity.CeremonyCustodian;
+import com.artivisi.hsm.simulator.entity.KeyCeremony;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -13,6 +14,12 @@ import java.util.UUID;
 public interface CeremonyCustodianRepository extends JpaRepository<CeremonyCustodian, UUID> {
 
     Optional<CeremonyCustodian> findByContributionToken(String contributionToken);
+
+    List<CeremonyCustodian> findByKeyCeremony(KeyCeremony keyCeremony);
+
+    List<CeremonyCustodian> findByKeyCeremonyAndContributionStatus(KeyCeremony keyCeremony, CeremonyCustodian.ContributionStatus contributionStatus);
+
+    long countByKeyCeremonyAndContributionStatus(KeyCeremony keyCeremony, CeremonyCustodian.ContributionStatus contributionStatus);
 
     @Query("SELECT cc FROM CeremonyCustodian cc WHERE cc.keyCeremony.id = ?1")
     List<CeremonyCustodian> findByKeyCeremonyId(UUID keyCeremonyId);
