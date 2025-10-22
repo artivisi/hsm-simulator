@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSM Simulator - ArtiVisi Intermedia</title>
+    <link rel="stylesheet" th:href="@{/css/output.css}">
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen text-white">
+    <div class="container mx-auto px-4 py-16 max-w-5xl">
+        <!-- Header -->
+        <div class="text-center mb-12">
+            <!-- ArtiVisi Logo -->
+            <div class="mb-8 flex justify-center">
+                <img th:src="@{/img/artivisi-logo-white.svg}" alt="ArtiVisi Intermedia" class="h-16 w-auto opacity-90 hover:opacity-100 transition-opacity">
+            </div>
+
+            <h1 class="text-6xl font-bold mb-4 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                HSM Simulator
+            </h1>
+            <p class="text-2xl text-slate-300 mb-2">Hardware Security Module Simulator</p>
+            <p class="text-lg text-slate-400">by <span class="text-blue-400 font-semibold">ArtiVisi Intermedia</span></p>
+        </div>
+
+        <!-- Description Card -->
+        <div class="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-8 mb-8 shadow-2xl">
+            <h2 class="text-2xl font-semibold mb-4 text-slate-200">About This Simulator</h2>
+            <p class="text-slate-300 leading-relaxed mb-4">
+                A comprehensive platform for simulating Hardware Security Module (HSM) operations in banking environments.
+                This educational tool demonstrates cryptographic key management, including key ceremony processes,
+                terminal key distribution (TMK, TPK, TSK), and inter-bank key exchange operations (ZMK, ZPK, ZSK)
+                for the four-party card processing model.
+            </p>
+            <p class="text-slate-300 leading-relaxed">
+                Features include Shamir's Secret Sharing with 2-of-3 threshold scheme, complete key hierarchy management,
+                key rotation with audit trail, and zone key exchange tracking for secure inter-bank communication.
+            </p>
+        </div>
+
+        <!-- Disclaimer Card -->
+        <div class="bg-yellow-900/20 border border-yellow-700/50 rounded-2xl p-6 mb-12 shadow-xl">
+            <div class="flex items-start">
+                <div class="flex-shrink-0">
+                    <svg class="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-xl font-semibold text-yellow-300 mb-2">Educational Use Only</h3>
+                    <p class="text-yellow-100/90 leading-relaxed">
+                        This is a simulator designed for educational and training purposes only.
+                        <strong>DO NOT use in production environments.</strong>
+                        The cryptographic operations are simplified demonstrations and do not meet production security requirements.
+                        No actual sensitive data should be processed through this system.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Action Button -->
+        <div class="text-center mb-12">
+            <a href="/hsm/initialize"
+               class="inline-block bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-xl px-12 py-6 rounded-2xl shadow-2xl transform hover:scale-105 transition-all duration-200 ease-in-out">
+                <div class="flex items-center space-x-3">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    <span>Initialize & Activate HSM</span>
+                </div>
+            </a>
+            <p class="text-slate-400 mt-4 text-sm">Start the key ceremony to initialize your HSM</p>
+        </div>
+
+        <!-- Features Grid -->
+        <div class="grid md:grid-cols-3 gap-6 mb-12">
+            <div class="bg-slate-800/30 border border-slate-700 rounded-xl p-6 hover:border-blue-500/50 transition-colors">
+                <div class="text-blue-400 mb-3">
+                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-200 mb-2">Key Ceremony</h3>
+                <p class="text-slate-400 text-sm">Multi-custodian initialization using Shamir's Secret Sharing</p>
+            </div>
+
+            <div class="bg-slate-800/30 border border-slate-700 rounded-xl p-6 hover:border-purple-500/50 transition-colors">
+                <div class="text-purple-400 mb-3">
+                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-200 mb-2">Four-Party Model</h3>
+                <p class="text-slate-400 text-sm">Issuer, Acquirer, Switch, and Processor banking operations</p>
+            </div>
+
+            <div class="bg-slate-800/30 border border-slate-700 rounded-xl p-6 hover:border-green-500/50 transition-colors">
+                <div class="text-green-400 mb-3">
+                    <svg class="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-slate-200 mb-2">Key Management</h3>
+                <p class="text-slate-400 text-sm">Complete lifecycle for TMK, TPK, TSK, ZMK, ZPK, ZSK keys</p>
+            </div>
+        </div>
+
+        <!-- Footer with Version Info -->
+        <div class="text-center text-slate-500 text-sm border-t border-slate-700 pt-8">
+            <p class="mb-2">
+                <span class="inline-flex items-center space-x-2 bg-slate-800/50 px-4 py-2 rounded-lg border border-slate-700">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                    </svg>
+                    <span>Version: <span class="text-slate-300 font-mono" th:text="${gitCommitId}">unknown</span></span>
+                    <span class="text-slate-600">|</span>
+                    <span>Branch: <span class="text-slate-300 font-mono" th:text="${gitBranch}">unknown</span></span>
+                </span>
+            </p>
+            <p class="text-xs text-slate-600 mt-2" th:text="'Build: ' + ${gitCommitTime}">Build time</p>
+            <p class="mt-4 text-slate-600">&copy; 2025 ArtiVisi Intermedia. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>

@@ -40,7 +40,7 @@ public interface KeyRestorationRequestRepository extends JpaRepository<KeyRestor
            "ORDER BY k.requestedAt DESC")
     List<KeyRestorationRequest> findByStatusIn(@Param("statuses") List<String> statuses);
 
-    @Query("SELECT k FROM KeyRestorationRequest k WHERE k.approved = true " +
+    @Query("SELECT k FROM KeyRestorationRequest k WHERE k.approvedAt IS NOT NULL " +
            "AND k.status != 'COMPLETED'")
     List<KeyRestorationRequest> findApprovedPendingCompletion();
 
