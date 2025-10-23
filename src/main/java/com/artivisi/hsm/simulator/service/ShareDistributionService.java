@@ -30,6 +30,7 @@ public class ShareDistributionService {
     private final KeyShareRepository shareRepository;
     private final MasterKeyRepository masterKeyRepository;
     private final CeremonyCustodianRepository ceremonyCustodianRepository;
+    private final EmailService emailService;
 
     /**
      * Gets all shares for a ceremony with distribution status
@@ -183,7 +184,7 @@ public class ShareDistributionService {
     }
 
     /**
-     * Simulates sending share via email (logs for MVP)
+     * Sends share via email with attachment
      */
     @Transactional
     public void sendShareViaEmail(UUID shareId) {
@@ -193,19 +194,151 @@ public class ShareDistributionService {
                 .orElseThrow(() -> new IllegalArgumentException("Share not found"));
 
         CeremonyCustodian ceremonyCustodian = share.getCeremonyCustodian();
-        String email = ceremonyCustodian.getKeyCustodian().getEmail();
+        MasterKey masterKey = share.getMasterKey();
+        KeyCeremony ceremony = masterKey.getKeyCeremony();
+        String recipientEmail = ceremonyCustodian.getKeyCustodian().getEmail();
+        String custodianName = ceremonyCustodian.getKeyCustodian().getFullName();
 
-        // In production, integrate with actual email service
-        log.info("EMAIL SIMULATION:");
-        log.info("  To: {}", email);
-        log.info("  Subject: Your HSM Key Share - {}", share.getShareId());
-        log.info("  Share ID: {}", share.getShareId());
-        log.info("  Custodian: {}", ceremonyCustodian.getKeyCustodian().getFullName());
+        // Generate share download content
+        byte[] shareContent = generateShareDownload(shareId);
 
-        // Mark as distributed
-        markAsDistributed(UUID.fromString(share.getId().toString()), KeyShare.DistributionMethod.EMAIL);
+        // Build HTML email content
+        String htmlContent = buildShareEmailHtml(
+                custodianName,
+                ceremonyCustodian.getCustodianLabel(),
+                ceremony.getCeremonyName(),
+                share.getShareId(),
+                ceremony.getThreshold(),
+                ceremony.getNumberOfCustodians()
+        );
 
-        log.info("Email sent successfully (simulated)");
+        // Send email with attachment
+        try {
+            emailService.sendHtmlEmailWithAttachment(
+                    recipientEmail,
+                    "Your HSM Key Share - " + ceremony.getCeremonyName(),
+                    htmlContent,
+                    "key-share-" + share.getShareId() + ".txt",
+                    shareContent
+            );
+
+            // Mark as distributed
+            markAsDistributed(UUID.fromString(share.getId().toString()), KeyShare.DistributionMethod.EMAIL);
+
+            // Log appropriate message based on whether email was actually sent
+            if (emailService.isEmailEnabled()) {
+                log.info("Email sent successfully to {}", recipientEmail);
+            } else {
+                log.info("Email sending disabled - simulated email to {}", recipientEmail);
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to send email to {}", recipientEmail, e);
+            throw new RuntimeException("Failed to send email: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Builds HTML email content for share distribution
+     */
+    private String buildShareEmailHtml(String custodianName, String custodianLabel,
+                                       String ceremonyName, String shareId,
+                                       int threshold, int totalShares) {
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body {
+                            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                            line-height: 1.6;
+                            color: #333;
+                            max-width: 600px;
+                            margin: 0 auto;
+                            padding: 20px;
+                        }
+                        .header {
+                            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                            color: white;
+                            padding: 30px;
+                            border-radius: 10px 10px 0 0;
+                            text-align: center;
+                        }
+                        .content {
+                            background: #f8f9fa;
+                            padding: 30px;
+                            border-radius: 0 0 10px 10px;
+                        }
+                        .info-box {
+                            background: white;
+                            padding: 20px;
+                            border-radius: 8px;
+                            margin: 20px 0;
+                            border-left: 4px solid #667eea;
+                        }
+                        .warning-box {
+                            background: #fff3cd;
+                            border: 1px solid #ffc107;
+                            padding: 15px;
+                            border-radius: 8px;
+                            margin: 20px 0;
+                        }
+                        .footer {
+                            text-align: center;
+                            color: #6c757d;
+                            font-size: 12px;
+                            margin-top: 30px;
+                        }
+                        h1, h2 {
+                            margin: 0 0 15px 0;
+                        }
+                        .label {
+                            font-weight: bold;
+                            color: #667eea;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>🔐 HSM Key Share</h1>
+                        <p>Secure Key Ceremony Distribution</p>
+                    </div>
+
+                    <div class="content">
+                        <h2>Dear %s,</h2>
+
+                        <p>You have been designated as <strong>%s</strong> for the HSM key ceremony <strong>"%s"</strong>.</p>
+
+                        <div class="info-box">
+                            <p><span class="label">Share ID:</span> %s</p>
+                            <p><span class="label">Threshold:</span> %d of %d shares required for key recovery</p>
+                            <p><span class="label">Your Role:</span> Custodian of encrypted key share</p>
+                        </div>
+
+                        <p>Your encrypted key share is attached to this email as a text file. Please:</p>
+                        <ul>
+                            <li>Download and store the attached file in a secure location</li>
+                            <li>Keep multiple backups in different secure locations</li>
+                            <li>DO NOT share this file with unauthorized personnel</li>
+                            <li>Keep the file encrypted and password-protected if possible</li>
+                        </ul>
+
+                        <div class="warning-box">
+                            <strong>⚠️ Security Notice</strong>
+                            <p style="margin: 10px 0 0 0;">Any %d shares can be combined to reconstruct the master key. Protect this share as you would protect the master key itself.</p>
+                        </div>
+
+                        <p>If you have any questions or concerns, please contact your security administrator immediately.</p>
+                    </div>
+
+                    <div class="footer">
+                        <p>This email was automatically generated by HSM Simulator</p>
+                        <p>ArtiVisi Intermedia &copy; 2025</p>
+                    </div>
+                </body>
+                </html>
+                """.formatted(custodianName, custodianLabel, ceremonyName, shareId, threshold, totalShares, threshold);
     }
 
     /**
