@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Key Ceremony Contribution - ArtiVisi Intermedia</title>
+    <link rel="stylesheet" th:href="@{/css/output.css}">
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen text-white">
+    <div class="container mx-auto px-4 py-12 max-w-3xl">
+        <!-- Logo -->
+        <div class="text-center mb-8">
+            <img th:src="@{/img/artivisi-logo-white.svg}" alt="ArtiVisi Intermedia" class="h-12 w-auto mx-auto opacity-90 mb-6">
+        </div>
+
+        <!-- Header -->
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Key Ceremony Contribution
+            </h1>
+        </div>
+
+        <!-- Welcome Card -->
+        <div class="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-6 mb-6 shadow-2xl">
+            <h2 class="text-2xl font-semibold mb-4 text-slate-200">
+                Welcome, <span th:text="${custodianLabel}">Custodian A</span> - <span th:text="${custodianName}">Alice Johnson</span>
+            </h2>
+
+            <div class="space-y-2 text-slate-300">
+                <p>You have been selected to participate in:</p>
+                <p class="text-lg font-semibold text-white" th:text="${ceremonyName}">HSM Initialization 2025</p>
+                <p class="text-sm text-slate-400" th:text="${ceremonyPurpose}">Purpose of the ceremony</p>
+                <p th:if="${deadline}" class="text-sm text-yellow-300">
+                    Deadline: <span th:text="${#temporals.format(deadline, 'MMMM dd, yyyy \'at\' HH:mm')}">October 25, 2025 at 18:00</span>
+                </p>
+            </div>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-blue-900/20 border border-blue-700/50 rounded-2xl p-6 mb-6">
+            <div class="flex items-start">
+                <svg class="w-6 h-6 text-blue-400 mr-3 flex-shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                    <h3 class="text-xl font-semibold text-blue-300 mb-3">Instructions</h3>
+                    <ol class="list-decimal list-inside space-y-2 text-blue-100 text-sm">
+                        <li>Create a strong, memorable passphrase</li>
+                        <li>Minimum <span th:text="${minLength}">12</span> characters (<span th:text="${recommendedLength}">20</span>+ recommended)</li>
+                        <li>Use a mix of words, numbers, and symbols</li>
+                        <li><strong>DO NOT share</strong> this passphrase with anyone</li>
+                        <li>Store it securely (password manager recommended)</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contribution Form -->
+        <form id="contributionForm">
+            <input type="hidden" id="token" name="token" th:value="${token}">
+
+            <!-- Passphrase Input -->
+            <div class="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-6 mb-6 shadow-2xl">
+                <h2 class="text-2xl font-semibold mb-4 text-slate-200">Enter Your Passphrase</h2>
+
+                <div class="mb-6">
+                    <label for="passphrase" class="block text-sm font-medium text-slate-300 mb-2">
+                        Passphrase <span class="text-red-400">*</span>
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="passphrase" name="passphrase" required autocomplete="new-password"
+                               class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-blue-500">
+                        <button type="button" onclick="togglePasswordVisibility('passphrase', 'passIcon1')"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                            <svg id="passIcon1" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Strength Meter -->
+                <div class="mb-6">
+                    <div class="flex justify-between text-sm text-slate-400 mb-2">
+                        <span>Strength Meter:</span>
+                        <span id="strengthLabel" class="font-semibold">Not Analyzed</span>
+                    </div>
+                    <div class="w-full bg-slate-700 rounded-full h-3 mb-3">
+                        <div id="strengthBar" class="h-3 rounded-full transition-all duration-300" style="width: 0%"></div>
+                    </div>
+
+                    <!-- Strength Details -->
+                    <div id="strengthDetails" class="space-y-1 text-sm">
+                        <div class="flex items-center text-slate-400">
+                            <span id="lengthIcon" class="mr-2">○</span>
+                            <span>Length: <span id="lengthValue">0</span> characters</span>
+                        </div>
+                        <div class="flex items-center text-slate-400">
+                            <span id="uppercaseIcon" class="mr-2">○</span>
+                            <span>Uppercase letters</span>
+                        </div>
+                        <div class="flex items-center text-slate-400">
+                            <span id="lowercaseIcon" class="mr-2">○</span>
+                            <span>Lowercase letters</span>
+                        </div>
+                        <div class="flex items-center text-slate-400">
+                            <span id="digitIcon" class="mr-2">○</span>
+                            <span>Numbers</span>
+                        </div>
+                        <div class="flex items-center text-slate-400">
+                            <span id="specialIcon" class="mr-2">○</span>
+                            <span>Special characters</span>
+                        </div>
+                        <div class="mt-2 text-slate-400">
+                            <span>Entropy Score: <span id="entropyScore" class="font-mono text-slate-300">0.0</span>/10</span>
+                        </div>
+                    </div>
+
+                    <!-- Tip -->
+                    <div id="strengthTip" class="mt-4 p-3 bg-slate-900/50 rounded-lg text-sm text-slate-400 hidden">
+                        <span class="text-blue-400">💡 Tip:</span> <span id="tipText"></span>
+                    </div>
+                </div>
+
+                <!-- Confirm Passphrase -->
+                <div class="mb-4">
+                    <label for="passphraseConfirm" class="block text-sm font-medium text-slate-300 mb-2">
+                        Confirm Your Passphrase <span class="text-red-400">*</span>
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="passphraseConfirm" name="passphraseConfirm" required autocomplete="new-password"
+                               class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-blue-500">
+                        <button type="button" onclick="togglePasswordVisibility('passphraseConfirm', 'passIcon2')"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                            <svg id="passIcon2" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                    <p id="matchStatus" class="mt-2 text-sm"></p>
+                </div>
+            </div>
+
+            <!-- Confirmation -->
+            <div class="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-6 mb-6 shadow-2xl">
+                <label class="flex items-start cursor-pointer">
+                    <input type="checkbox" id="confirmation" name="confirmation" required
+                           class="w-5 h-5 text-blue-600 bg-slate-900 border-slate-600 rounded mt-0.5 focus:ring-blue-500">
+                    <span class="ml-3 text-slate-300">
+                        I understand this passphrase is critical for HSM recovery and I have stored it securely
+                    </span>
+                </label>
+            </div>
+
+            <!-- Submit Button -->
+            <button type="submit" id="submitBtn"
+                    class="w-full px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold text-lg rounded-lg shadow-lg transition-all">
+                <span id="btnText">Submit Contribution</span>
+                <span id="btnSpinner" class="hidden">
+                    <svg class="inline w-5 h-5 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Submitting...
+                </span>
+            </button>
+        </form>
+    </div>
+
+    <script th:inline="javascript">
+        const token = /*[[${token}]]*/ '';
+        let debounceTimer;
+
+        // Password visibility toggle
+        function togglePasswordVisibility(fieldId, iconId) {
+            const field = document.getElementById(fieldId);
+            const icon = document.getElementById(iconId);
+            field.type = field.type === 'password' ? 'text' : 'password';
+        }
+
+        // Real-time passphrase validation
+        document.getElementById('passphrase').addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => validatePassphrase(this.value), 300);
+        });
+
+        async function validatePassphrase(passphrase) {
+            if (!passphrase) {
+                resetStrengthMeter();
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/contributions/validate-passphrase', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ passphrase })
+                });
+
+                const result = await response.json();
+                updateStrengthMeter(result);
+            } catch (error) {
+                console.error('Error validating passphrase:', error);
+            }
+        }
+
+        function updateStrengthMeter(result) {
+            const strengthBar = document.getElementById('strengthBar');
+            const strengthLabel = document.getElementById('strengthLabel');
+            const entropyScore = document.getElementById('entropyScore');
+            const lengthValue = document.getElementById('lengthValue');
+            const strengthTip = document.getElementById('strengthTip');
+            const tipText = document.getElementById('tipText');
+
+            // Update length
+            lengthValue.textContent = result.length;
+            updateCheckmark('lengthIcon', result.length >= /*[[${minLength}]]*/ 12);
+
+            // Update character type checks
+            updateCheckmark('uppercaseIcon', result.hasUppercase);
+            updateCheckmark('lowercaseIcon', result.hasLowercase);
+            updateCheckmark('digitIcon', result.hasDigit);
+            updateCheckmark('specialIcon', result.hasSpecial);
+
+            // Update entropy score
+            entropyScore.textContent = result.entropyScore;
+
+            // Update strength bar and label
+            const strength = result.strength;
+            let percentage, color, label, tip;
+
+            switch(strength) {
+                case 'WEAK':
+                    percentage = 20; color = 'bg-red-600'; label = 'Weak'; tip = 'Add more characters and variety';
+                    break;
+                case 'FAIR':
+                    percentage = 40; color = 'bg-orange-600'; label = 'Fair'; tip = 'Add more character types';
+                    break;
+                case 'GOOD':
+                    percentage = 60; color = 'bg-yellow-600'; label = 'Good'; tip = 'Almost there! Add a few more characters';
+                    break;
+                case 'STRONG':
+                    percentage = 80; color = 'bg-blue-600'; label = 'Strong'; tip = 'Great! Add 4 more chars for VERY_STRONG';
+                    break;
+                case 'VERY_STRONG':
+                    percentage = 100; color = 'bg-green-600'; label = 'Very Strong'; tip = 'Excellent passphrase!';
+                    break;
+                default:
+                    percentage = 0; color = 'bg-slate-600'; label = 'Unknown';
+            }
+
+            strengthBar.style.width = percentage + '%';
+            strengthBar.className = `h-3 rounded-full transition-all duration-300 ${color}`;
+            strengthLabel.textContent = label;
+            strengthLabel.className = `font-semibold ${color.replace('bg-', 'text-')}`;
+
+            // Show tip
+            tipText.textContent = tip;
+            strengthTip.classList.remove('hidden');
+        }
+
+        function updateCheckmark(iconId, isValid) {
+            const icon = document.getElementById(iconId);
+            const parent = icon.parentElement;
+            if (isValid) {
+                icon.textContent = '✓';
+                parent.classList.remove('text-slate-400');
+                parent.classList.add('text-green-400');
+            } else {
+                icon.textContent = '○';
+                parent.classList.remove('text-green-400');
+                parent.classList.add('text-slate-400');
+            }
+        }
+
+        function resetStrengthMeter() {
+            document.getElementById('strengthBar').style.width = '0%';
+            document.getElementById('strengthLabel').textContent = 'Not Analyzed';
+            document.getElementById('entropyScore').textContent = '0.0';
+            document.getElementById('lengthValue').textContent = '0';
+            ['lengthIcon', 'uppercaseIcon', 'lowercaseIcon', 'digitIcon', 'specialIcon'].forEach(id => {
+                updateCheckmark(id, false);
+            });
+            document.getElementById('strengthTip').classList.add('hidden');
+        }
+
+        // Passphrase match validation
+        document.getElementById('passphraseConfirm').addEventListener('input', function() {
+            const passphrase = document.getElementById('passphrase').value;
+            const confirm = this.value;
+            const matchStatus = document.getElementById('matchStatus');
+
+            if (!confirm) {
+                matchStatus.textContent = '';
+                return;
+            }
+
+            if (passphrase === confirm) {
+                matchStatus.textContent = '✓ Passphrases match';
+                matchStatus.className = 'mt-2 text-sm text-green-400';
+            } else {
+                matchStatus.textContent = '✗ Passphrases do not match';
+                matchStatus.className = 'mt-2 text-sm text-red-400';
+            }
+        });
+
+        // Form submission
+        document.getElementById('contributionForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const passphrase = document.getElementById('passphrase').value;
+            const passphraseConfirm = document.getElementById('passphraseConfirm').value;
+            const confirmation = document.getElementById('confirmation').checked;
+
+            if (passphrase !== passphraseConfirm) {
+                alert('Passphrases do not match');
+                return;
+            }
+
+            if (!confirmation) {
+                alert('Please confirm that you have stored your passphrase securely');
+                return;
+            }
+
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+
+            submitBtn.disabled = true;
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch(`/api/contributions/${token}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        passphrase: passphrase,
+                        passphraseConfirm: passphraseConfirm,
+                        confirmed: confirmation
+                    })
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Redirect to success page
+                    const params = new URLSearchParams({
+                        contributionId: result.contributionId,
+                        strength: result.strength,
+                        entropyScore: result.entropyScore,
+                        custodianName: /*[[${custodianName}]]*/ ''
+                    });
+                    window.location.href = `/hsm/contribute/success?${params.toString()}`;
+                } else {
+                    alert('Error: ' + result.error);
+                    submitBtn.disabled = false;
+                    btnText.classList.remove('hidden');
+                    btnSpinner.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Error submitting contribution:', error);
+                alert('An unexpected error occurred');
+                submitBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>

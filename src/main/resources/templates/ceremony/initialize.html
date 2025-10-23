@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Initialize HSM - ArtiVisi Intermedia</title>
+    <link rel="stylesheet" th:href="@{/css/output.css}">
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen text-white">
+    <div class="container mx-auto px-4 py-12 max-w-4xl">
+        <!-- Header -->
+        <div class="mb-8">
+            <a th:href="@{/}" class="text-blue-400 hover:text-blue-300 inline-flex items-center mb-4">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                Back to Home
+            </a>
+            <h1 class="text-4xl font-bold mb-2 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+                Initialize New HSM Key Ceremony
+            </h1>
+            <p class="text-slate-400">Create a new key ceremony with multi-custodian passphrase contributions</p>
+        </div>
+
+        <!-- Error Alert -->
+        <div id="errorAlert" class="hidden bg-red-900/20 border border-red-700/50 rounded-xl p-4 mb-6">
+            <div class="flex items-start">
+                <svg class="w-6 h-6 text-red-500 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <div>
+                    <h3 class="text-red-300 font-semibold mb-1">Error</h3>
+                    <p id="errorMessage" class="text-red-200 text-sm"></p>
+                </div>
+            </div>
+        </div>
+
+        <form id="ceremonyForm">
+            <!-- Ceremony Information -->
+            <div class="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-6 mb-6 shadow-2xl">
+                <h2 class="text-2xl font-semibold mb-4 text-slate-200">Ceremony Information</h2>
+
+                <div class="space-y-4">
+                    <div>
+                        <label for="ceremonyName" class="block text-sm font-medium text-slate-300 mb-2">
+                            Ceremony Name <span class="text-red-400">*</span>
+                        </label>
+                        <input type="text" id="ceremonyName" name="ceremonyName" required
+                               class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                               placeholder="e.g., HSM Initialization 2025">
+                    </div>
+
+                    <div>
+                        <label for="purpose" class="block text-sm font-medium text-slate-300 mb-2">
+                            Purpose <span class="text-red-400">*</span>
+                        </label>
+                        <textarea id="purpose" name="purpose" required rows="3"
+                                  class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500"
+                                  placeholder="Describe the purpose of this key ceremony..."></textarea>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-slate-300 mb-2">
+                            Ceremony Type <span class="text-red-400">*</span>
+                        </label>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="radio" name="ceremonyType" value="INITIALIZATION" checked
+                                       class="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500">
+                                <span class="ml-2 text-slate-300">Initialization</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="ceremonyType" value="RESTORATION"
+                                       class="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500">
+                                <span class="ml-2 text-slate-300">Restoration</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="ceremonyType" value="KEY_ROTATION"
+                                       class="w-4 h-4 text-blue-600 bg-slate-900 border-slate-600 focus:ring-blue-500">
+                                <span class="ml-2 text-slate-300">Key Rotation</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Custodian Selection -->
+            <div class="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-6 mb-6 shadow-2xl">
+                <h2 class="text-2xl font-semibold mb-4 text-slate-200">Custodian Selection</h2>
+                <p class="text-slate-400 text-sm mb-4">Select exactly 3 custodians who will participate in this ceremony</p>
+
+                <div id="custodianList" class="space-y-2">
+                    <div th:each="custodian : ${custodians}" class="flex items-center p-3 bg-slate-900/30 rounded-lg hover:bg-slate-900/50 transition-colors">
+                        <input type="checkbox" th:id="'custodian-' + ${custodian.id}"
+                               th:value="${custodian.id}" name="custodianId"
+                               class="custodian-checkbox w-5 h-5 text-blue-600 bg-slate-900 border-slate-600 rounded focus:ring-blue-500">
+                        <label th:for="'custodian-' + ${custodian.id}" class="ml-3 flex-grow cursor-pointer">
+                            <span class="text-white font-medium" th:text="${custodian.fullName}">Custodian Name</span>
+                            <span class="text-slate-400 text-sm ml-2" th:text="'(' + ${custodian.email} + ')'">email</span>
+                            <span th:if="${custodian.department}" class="text-slate-500 text-sm ml-2" th:text="'- ' + ${custodian.department}">dept</span>
+                        </label>
+                    </div>
+                </div>
+
+                <p id="custodianCountError" class="hidden text-red-400 text-sm mt-2">
+                    Please select exactly 3 custodians
+                </p>
+            </div>
+
+            <!-- Security Parameters -->
+            <div class="bg-slate-800/50 backdrop-blur-sm rounded-2xl border border-slate-700 p-6 mb-6 shadow-2xl">
+                <h2 class="text-2xl font-semibold mb-4 text-slate-200">Security Parameters</h2>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    <div>
+                        <label for="numberOfCustodians" class="block text-sm font-medium text-slate-300 mb-2">
+                            Number of Custodians
+                        </label>
+                        <input type="number" id="numberOfCustodians" name="numberOfCustodians"
+                               th:value="${defaultNumberOfCustodians}" readonly
+                               class="w-full bg-slate-900/30 border border-slate-600 rounded-lg px-4 py-2 text-slate-400 cursor-not-allowed">
+                    </div>
+
+                    <div>
+                        <label for="threshold" class="block text-sm font-medium text-slate-300 mb-2">
+                            Threshold (minimum required)
+                        </label>
+                        <input type="number" id="threshold" name="threshold"
+                               th:value="${defaultThreshold}" readonly
+                               class="w-full bg-slate-900/30 border border-slate-600 rounded-lg px-4 py-2 text-slate-400 cursor-not-allowed">
+                    </div>
+
+                    <div>
+                        <label for="algorithm" class="block text-sm font-medium text-slate-300 mb-2">
+                            Algorithm
+                        </label>
+                        <select id="algorithm" name="algorithm"
+                                class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500">
+                            <option value="AES-256" selected>AES-256</option>
+                            <option value="AES-128">AES-128</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label for="keySize" class="block text-sm font-medium text-slate-300 mb-2">
+                            Key Size (bits)
+                        </label>
+                        <select id="keySize" name="keySize"
+                                class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500">
+                            <option value="256" selected>256 bits</option>
+                            <option value="128">128 bits</option>
+                        </select>
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label for="contributionDeadline" class="block text-sm font-medium text-slate-300 mb-2">
+                            Contribution Deadline <span class="text-red-400">*</span>
+                        </label>
+                        <input type="datetime-local" id="contributionDeadline" name="contributionDeadline" required
+                               class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-2 text-white focus:outline-none focus:border-blue-500">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex justify-between items-center">
+                <a th:href="@{/}" class="px-6 py-3 border border-slate-600 text-slate-300 rounded-lg hover:bg-slate-800 transition-colors">
+                    Cancel
+                </a>
+                <button type="submit" id="submitBtn"
+                        class="px-8 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold rounded-lg shadow-lg transition-all">
+                    <span id="btnText">Create Ceremony</span>
+                    <span id="btnSpinner" class="hidden">
+                        <svg class="inline w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Creating...
+                    </span>
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // Set default deadline to 3 days from now
+        const deadlineInput = document.getElementById('contributionDeadline');
+        const defaultDeadline = new Date();
+        defaultDeadline.setDate(defaultDeadline.getDate() + 3);
+        deadlineInput.value = defaultDeadline.toISOString().slice(0, 16);
+
+        // Custodian selection validation
+        const custodianCheckboxes = document.querySelectorAll('.custodian-checkbox');
+        const custodianCountError = document.getElementById('custodianCountError');
+
+        custodianCheckboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', () => {
+                const selectedCount = document.querySelectorAll('.custodian-checkbox:checked').length;
+                if (selectedCount !== 3) {
+                    custodianCountError.classList.remove('hidden');
+                } else {
+                    custodianCountError.classList.add('hidden');
+                }
+            });
+        });
+
+        // Form submission
+        document.getElementById('ceremonyForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Validate custodian selection
+            const selectedCustodians = Array.from(document.querySelectorAll('.custodian-checkbox:checked')).map(cb => cb.value);
+            if (selectedCustodians.length !== 3) {
+                showError('Please select exactly 3 custodians');
+                return;
+            }
+
+            // Show loading state
+            const submitBtn = document.getElementById('submitBtn');
+            const btnText = document.getElementById('btnText');
+            const btnSpinner = document.getElementById('btnSpinner');
+            submitBtn.disabled = true;
+            btnText.classList.add('hidden');
+            btnSpinner.classList.remove('hidden');
+
+            try {
+                const formData = {
+                    ceremonyName: document.getElementById('ceremonyName').value,
+                    purpose: document.getElementById('purpose').value,
+                    ceremonyType: document.querySelector('input[name="ceremonyType"]:checked').value,
+                    custodianIds: selectedCustodians,
+                    numberOfCustodians: parseInt(document.getElementById('numberOfCustodians').value),
+                    threshold: parseInt(document.getElementById('threshold').value),
+                    algorithm: document.getElementById('algorithm').value,
+                    keySize: parseInt(document.getElementById('keySize').value),
+                    contributionDeadline: document.getElementById('contributionDeadline').value
+                };
+
+                const response = await fetch('/api/ceremonies', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Redirect to ceremony dashboard
+                    window.location.href = `/hsm/ceremony/${result.ceremonyId}`;
+                } else {
+                    showError(result.error || 'Failed to create ceremony');
+                    submitBtn.disabled = false;
+                    btnText.classList.remove('hidden');
+                    btnSpinner.classList.add('hidden');
+                }
+
+            } catch (error) {
+                console.error('Error creating ceremony:', error);
+                showError('An unexpected error occurred');
+                submitBtn.disabled = false;
+                btnText.classList.remove('hidden');
+                btnSpinner.classList.add('hidden');
+            }
+        });
+
+        function showError(message) {
+            const errorAlert = document.getElementById('errorAlert');
+            const errorMessage = document.getElementById('errorMessage');
+            errorMessage.textContent = message;
+            errorAlert.classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</body>
+</html>
