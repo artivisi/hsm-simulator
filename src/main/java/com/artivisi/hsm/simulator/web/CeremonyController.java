@@ -2,11 +2,15 @@ package com.artivisi.hsm.simulator.web;
 
 import com.artivisi.hsm.simulator.entity.KeyCeremony;
 import com.artivisi.hsm.simulator.entity.KeyCustodian;
+import com.artivisi.hsm.simulator.entity.KeyShare;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.repository.KeyCustodianRepository;
 import com.artivisi.hsm.simulator.service.CeremonyService;
+import com.artivisi.hsm.simulator.service.ShareDistributionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
@@ -26,6 +30,7 @@ import java.util.UUID;
 public class CeremonyController {
 
     private final CeremonyService ceremonyService;
+    private final ShareDistributionService shareDistributionService;
     private final KeyCustodianRepository custodianRepository;
 
     /**
@@ -176,6 +181,115 @@ public class CeremonyController {
             return ResponseEntity.badRequest().body(Map.of(
                     "success", false,
                     "error", "Ceremony not found"
+            ));
+        }
+    }
+
+    /**
+     * Shows the share distribution page
+     */
+    @GetMapping("/hsm/ceremony/{ceremonyId}/shares")
+    public String showShareDistribution(@PathVariable UUID ceremonyId, Model model) {
+        log.info("Showing share distribution for ceremony: {}", ceremonyId);
+
+        try {
+            ShareDistributionService.ShareDistributionResponse response =
+                    shareDistributionService.getSharesForCeremony(ceremonyId);
+
+            model.addAttribute("masterKey", response.getMasterKey());
+            model.addAttribute("shares", response.getShares());
+            model.addAttribute("totalShares", response.getTotalShares());
+            model.addAttribute("distributedShares", response.getDistributedShares());
+            model.addAttribute("ceremonyId", ceremonyId);
+
+            return "ceremony/shares";
+
+        } catch (IllegalArgumentException e) {
+            log.error("Error loading shares: {}", e.getMessage());
+            model.addAttribute("error", "Ceremony or shares not found");
+            return "error/404";
+        }
+    }
+
+    /**
+     * Downloads a share as text file
+     */
+    @GetMapping("/api/shares/{shareId}/download")
+    @ResponseBody
+    public ResponseEntity<byte[]> downloadShare(@PathVariable UUID shareId) {
+        log.info("Downloading share: {}", shareId);
+
+        try {
+            byte[] shareData = shareDistributionService.generateShareDownload(shareId);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.TEXT_PLAIN);
+            headers.setContentDispositionFormData("attachment", "key-share-" + shareId + ".txt");
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(shareData);
+
+        } catch (IllegalArgumentException e) {
+            log.error("Share not found: {}", shareId);
+            return ResponseEntity.notFound().build();
+        }
+    }
+
+    /**
+     * Sends share via email (simulated for MVP)
+     */
+    @PostMapping("/api/shares/{shareId}/email")
+    @ResponseBody
+    public ResponseEntity<?> emailShare(@PathVariable UUID shareId) {
+        log.info("Sending share via email: {}", shareId);
+
+        try {
+            shareDistributionService.sendShareViaEmail(shareId);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Share sent via email successfully"
+            ));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Share not found"
+            ));
+        } catch (Exception e) {
+            log.error("Error sending email", e);
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "success", false,
+                    "error", "Failed to send email"
+            ));
+        }
+    }
+
+    /**
+     * Marks a share as distributed
+     */
+    @PostMapping("/api/shares/{shareId}/mark-distributed")
+    @ResponseBody
+    public ResponseEntity<?> markShareDistributed(@PathVariable UUID shareId,
+                                                   @RequestBody Map<String, String> request) {
+        log.info("Marking share as distributed: {}", shareId);
+
+        try {
+            String method = request.getOrDefault("method", "MANUAL");
+            KeyShare.DistributionMethod distributionMethod = KeyShare.DistributionMethod.valueOf(method);
+
+            shareDistributionService.markAsDistributed(shareId, distributionMethod);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Share marked as distributed"
+            ));
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
             ));
         }
     }

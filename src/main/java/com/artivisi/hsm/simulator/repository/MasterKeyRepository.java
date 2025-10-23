@@ -16,6 +16,8 @@ public interface MasterKeyRepository extends JpaRepository<MasterKey, UUID> {
 
     Optional<MasterKey> findByKeyFingerprint(String keyFingerprint);
 
+    Optional<MasterKey> findByKeyCeremonyId(UUID keyCeremonyId);
+
     List<MasterKey> findByStatus(MasterKey.KeyStatus status);
 
     @Query("SELECT m FROM MasterKey m WHERE m.status = 'ACTIVE' ORDER BY m.generatedAt DESC")
