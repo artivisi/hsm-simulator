@@ -25,36 +25,225 @@ The HSM Simulator uses PostgreSQL 17 with Flyway migrations for version control.
 
 ## Entity Relationship Diagram
 
-```
-┌─────────────────┐
-│  key_custodians │
-└────────┬────────┘
-         │
-         │ N:M
-         │
-┌────────▼────────────┐      ┌─────────────────┐
-│ ceremony_custodians │──────│ key_ceremonies  │
-└─────────────────────┘  1:N └────────┬────────┘
-                                      │
-                                      │ 1:1
-                                      │
-┌──────────────┐                ┌────▼──────────┐
-│    banks     │◄───────────────┤ master_keys   │
-└──────┬───────┘       N:1      └───────┬───────┘
-       │                                │
-       │ 1:N                           │ 1:N
-       │                                │
-┌──────▼───────┐               ┌───────▼────────────┐
-│  terminals   │               │  generated_pins    │
-└──────────────┘               └────────────────────┘
-                                       │
-                               ┌───────▼────────────┐
-                               │  generated_macs    │
-                               └────────────────────┘
+```mermaid
+erDiagram
+    %% Key Ceremony System
+    key_ceremonies ||--o{ ceremony_custodians : "has"
+    key_ceremonies ||--o{ passphrase_contributions : "has"
+    key_ceremonies ||--o{ key_shares : "distributes"
+    key_ceremonies ||--o{ ceremony_audit_logs : "logs"
+    key_ceremonies ||--o| master_keys : "generates"
 
-┌─────────────────┐
-│     users       │
-└─────────────────┘
+    key_custodians ||--o{ ceremony_custodians : "participates"
+    key_custodians ||--o{ passphrase_contributions : "contributes"
+    key_custodians ||--o{ key_shares : "receives"
+
+    %% Banking Infrastructure
+    banks ||--o{ terminals : "owns"
+    banks ||--o{ master_keys : "has"
+    banks ||--o{ zone_key_exchanges : "source"
+    banks ||--o{ zone_key_exchanges : "target"
+
+    %% Master Keys Hierarchy
+    master_keys ||--o{ master_keys : "parent_of"
+    master_keys ||--o{ master_keys : "rotated_from"
+    master_keys ||--o{ generated_pins : "encrypts"
+    master_keys ||--o{ generated_macs : "generates"
+    master_keys ||--o{ key_rotation_history : "old_key"
+    master_keys ||--o{ key_rotation_history : "new_key"
+
+    %% Tables Details
+    key_ceremonies {
+        uuid id PK
+        varchar ceremony_name
+        varchar algorithm
+        int key_size
+        int threshold
+        int total_custodians
+        varchar status
+        int current_custodians
+        timestamp created_at
+        timestamp completed_at
+        varchar created_by
+    }
+
+    key_custodians {
+        uuid id PK
+        varchar name
+        varchar email UK
+        varchar phone_number
+        varchar organization
+        varchar status
+        text public_key
+        timestamp created_at
+        timestamp last_ceremony_at
+    }
+
+    ceremony_custodians {
+        uuid id PK
+        uuid key_ceremony_id FK
+        uuid key_custodian_id FK
+        int sequence_number
+        timestamp contributed_at
+        boolean passphrase_submitted
+    }
+
+    passphrase_contributions {
+        uuid id PK
+        uuid key_ceremony_id FK
+        uuid key_custodian_id FK
+        varchar passphrase_hash
+        text entropy_contribution
+        varchar salt
+        timestamp contributed_at
+    }
+
+    key_shares {
+        uuid id PK
+        uuid key_ceremony_id FK
+        uuid key_custodian_id FK
+        int share_index
+        text encrypted_share
+        varchar verification_hash
+        timestamp distributed_at
+        varchar distributed_via
+        boolean email_sent
+        timestamp email_sent_at
+    }
+
+    master_keys {
+        uuid id PK
+        varchar master_key_id UK
+        uuid parent_key_id FK
+        uuid key_ceremony_id FK
+        varchar key_type
+        varchar algorithm
+        int key_size
+        bytea key_data_encrypted
+        varchar key_fingerprint
+        varchar key_checksum
+        varchar combined_entropy_hash
+        varchar generation_method
+        int kdf_iterations
+        varchar kdf_salt
+        varchar status
+        uuid rotated_from_key_id FK
+        timestamp activated_at
+        timestamp expires_at
+        timestamp revoked_at
+        text revocation_reason
+        timestamp created_at
+        varchar created_by
+    }
+
+    banks {
+        uuid id PK
+        varchar bank_code UK
+        varchar bank_name
+        varchar bank_type
+        varchar swift_code
+        varchar country_code
+        varchar status
+        varchar contact_email
+        varchar contact_phone
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    terminals {
+        uuid id PK
+        uuid bank_id FK
+        varchar terminal_id UK
+        varchar terminal_type
+        varchar manufacturer
+        varchar model
+        varchar location
+        varchar status
+        timestamp installed_at
+        timestamp last_maintenance_at
+        timestamp created_at
+        timestamp updated_at
+    }
+
+    generated_pins {
+        uuid id PK
+        varchar account_number
+        int pin_length
+        varchar pin_format
+        text encrypted_pin_block
+        varchar pin_verification_value
+        uuid encryption_key_id FK
+        varchar clear_pin
+        varchar status
+        int verification_attempts
+        timestamp last_verified_at
+        timestamp generated_at
+    }
+
+    generated_macs {
+        uuid id PK
+        text message
+        int message_length
+        varchar mac_value
+        varchar mac_algorithm
+        uuid mac_key_id FK
+        varchar status
+        int verification_attempts
+        timestamp last_verified_at
+        timestamp generated_at
+    }
+
+    zone_key_exchanges {
+        uuid id PK
+        uuid source_bank_id FK
+        uuid target_bank_id FK
+        varchar key_type
+        text encrypted_key
+        varchar key_check_value
+        varchar exchange_method
+        varchar status
+        varchar initiated_by
+        timestamp initiated_at
+        timestamp completed_at
+        text notes
+    }
+
+    key_rotation_history {
+        uuid id PK
+        uuid old_key_id FK
+        uuid new_key_id FK
+        varchar rotation_type
+        text rotation_reason
+        varchar rotated_by
+        timestamp rotated_at
+        text affected_systems
+        boolean rollback_possible
+    }
+
+    ceremony_audit_logs {
+        uuid id PK
+        uuid key_ceremony_id FK
+        varchar event_type
+        text event_description
+        varchar actor
+        varchar ip_address
+        timestamp timestamp
+        jsonb metadata
+    }
+
+    users {
+        uuid id PK
+        varchar username UK
+        varchar password
+        varchar email UK
+        varchar full_name
+        boolean enabled
+        boolean account_non_expired
+        boolean account_non_locked
+        boolean credentials_non_expired
+        timestamp created_at
+        timestamp updated_at
+    }
 ```
 
 ---
