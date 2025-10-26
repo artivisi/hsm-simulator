@@ -131,11 +131,16 @@ public class CeremonyController {
      */
     @PostMapping("/api/ceremonies/{ceremonyId}/generate")
     @ResponseBody
-    public ResponseEntity<?> generateMasterKey(@PathVariable UUID ceremonyId) {
+    public ResponseEntity<?> generateMasterKey(@PathVariable UUID ceremonyId,
+                                                @RequestBody Map<String, Object> request) {
         log.info("Generating master key for ceremony: {}", ceremonyId);
 
         try {
-            MasterKey masterKey = ceremonyService.generateMasterKey(ceremonyId, "admin");
+            @SuppressWarnings("unchecked")
+            Map<String, String> custodianPassphrases =
+                (Map<String, String>) request.getOrDefault("custodianPassphrases", Map.of());
+
+            MasterKey masterKey = ceremonyService.generateMasterKey(ceremonyId, "admin", custodianPassphrases);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,

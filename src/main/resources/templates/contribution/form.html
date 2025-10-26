@@ -187,6 +187,8 @@
         });
 
         async function validatePassphrase(passphrase) {
+            console.log('validatePassphrase called with length:', passphrase?.length);
+
             if (!passphrase) {
                 resetStrengthMeter();
                 return;
@@ -200,6 +202,7 @@
                 });
 
                 const result = await response.json();
+                console.log('API response:', result);
                 updateStrengthMeter(result);
             } catch (error) {
                 console.error('Error validating passphrase:', error);
@@ -207,6 +210,8 @@
         }
 
         function updateStrengthMeter(result) {
+            console.log('updateStrengthMeter called with:', result);
+
             const strengthBar = document.getElementById('strengthBar');
             const strengthLabel = document.getElementById('strengthLabel');
             const entropyScore = document.getElementById('entropyScore');
@@ -215,17 +220,18 @@
             const tipText = document.getElementById('tipText');
 
             // Update length
-            lengthValue.textContent = result.length;
+            console.log('Setting length to:', result.length);
+            lengthValue.textContent = result.length || 0;
             updateCheckmark('lengthIcon', result.length >= /*[[${minLength}]]*/ 12);
 
             // Update character type checks
-            updateCheckmark('uppercaseIcon', result.hasUppercase);
-            updateCheckmark('lowercaseIcon', result.hasLowercase);
-            updateCheckmark('digitIcon', result.hasDigit);
-            updateCheckmark('specialIcon', result.hasSpecial);
+            updateCheckmark('uppercaseIcon', result.hasUppercase || false);
+            updateCheckmark('lowercaseIcon', result.hasLowercase || false);
+            updateCheckmark('digitIcon', result.hasDigit || false);
+            updateCheckmark('specialIcon', result.hasSpecial || false);
 
             // Update entropy score
-            entropyScore.textContent = result.entropyScore;
+            entropyScore.textContent = result.entropyScore || '0.0';
 
             // Update strength bar and label
             const strength = result.strength;

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title layout:title-pattern="$CONTENT_TITLE - $LAYOUT_TITLE">HSM Simulator - ArtiVisi Intermedia</title>
+    <link rel="stylesheet" th:href="@{/css/output.css}">
+    <th:block layout:fragment="extra-head">
+        <!-- Pages can add additional head content here -->
+    </th:block>
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen text-white">
+    <div class="container mx-auto px-4 py-12">
+        <!-- Logo Header (optional, can be overridden) -->
+        <div layout:fragment="header" class="text-center mb-8">
+            <a th:href="@{/}">
+                <img th:src="@{/img/artivisi-logo-white.svg}" alt="ArtiVisi Intermedia"
+                     class="h-12 w-auto mx-auto opacity-90 hover:opacity-100 transition-opacity">
+            </a>
+        </div>
+
+        <!-- Main Content -->
+        <div layout:fragment="content">
+            <!-- Page content goes here -->
+        </div>
+
+        <!-- Footer (optional) -->
+        <div layout:fragment="footer" class="text-center text-slate-500 text-sm border-t border-slate-700 pt-8 mt-12">
+            <p>&copy; 2025 ArtiVisi Intermedia. All rights reserved.</p>
+        </div>
+    </div>
+
+    <!-- Page-specific scripts -->
+    <th:block layout:fragment="scripts">
+        <!-- Pages can add their own scripts here -->
+    </th:block>
+</body>
+</html>

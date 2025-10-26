@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Offline Key Recovery</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-5xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <a href="/" class="text-blue-600 hover:text-blue-800 flex items-center mb-4">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+                Back to Home
+            </a>
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Offline Key Recovery</h1>
+            <p class="text-slate-600">Reconstruct master key from share files with custodian passphrases</p>
+        </div>
+
+        <!-- Info Banner -->
+        <div class="bg-blue-50 border-l-4 border-blue-400 p-6 mb-6">
+            <div class="flex">
+                <div class="flex-shrink-0">
+                    <svg class="h-6 w-6 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/>
+                    </svg>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-blue-800 mb-2">Disaster Recovery Mode</h3>
+                    <p class="text-blue-700 leading-relaxed">
+                        Use this feature when the database is unavailable or lost. Upload the key share files
+                        that were distributed to custodians during the original key ceremony. You will need to provide
+                        each custodian's passphrase to decrypt their shares. The system will then reconstruct the master key
+                        using Shamir's Secret Sharing algorithm.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upload Section -->
+        <div class="bg-white border border-slate-200 rounded-lg p-8 mb-6">
+            <h2 class="text-xl font-semibold text-slate-900 mb-4">Upload Key Share Files</h2>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-slate-700 mb-2">
+                    Select Share Files <span class="text-red-600">*</span>
+                </label>
+                <input type="file" id="shareFiles" multiple accept=".txt"
+                       class="block w-full text-sm text-slate-500 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 border border-slate-300 rounded-lg cursor-pointer">
+                <p class="mt-2 text-sm text-slate-500">
+                    Upload at least the threshold number of share files (typically 2 of 3 shares required)
+                </p>
+            </div>
+
+            <div class="flex space-x-4">
+                <button onclick="parseFiles()" id="parseBtn"
+                        class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                    <span id="parseBtnText">Parse Files</span>
+                    <span id="parseBtnSpinner" class="hidden">
+                        <svg class="inline w-4 h-4 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Parsing...
+                    </span>
+                </button>
+
+                <button onclick="clearFiles()"
+                        class="px-6 py-3 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <!-- Parsed Shares Display -->
+        <div id="parsedSharesSection" class="hidden bg-white border border-slate-200 rounded-lg p-8 mb-6">
+            <h2 class="text-xl font-semibold text-slate-900 mb-4">Parsed Shares</h2>
+
+            <!-- Progress Indicator -->
+            <div class="mb-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-slate-700">Shares Uploaded</span>
+                    <span class="text-sm font-medium text-slate-900">
+                        <span id="sharesUploaded">0</span> / <span id="sharesRequired">0</span>
+                    </span>
+                </div>
+                <div class="w-full bg-slate-200 rounded-full h-3">
+                    <div id="progressBar" class="bg-blue-600 h-3 rounded-full transition-all" style="width: 0%"></div>
+                </div>
+            </div>
+
+            <!-- Threshold Status -->
+            <div id="thresholdMetBanner" class="hidden bg-green-50 border-l-4 border-green-400 p-4 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-green-800">Threshold Met!</p>
+                        <p class="text-sm text-green-700 mt-1">You have uploaded enough shares to reconstruct the master key.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="thresholdNotMetBanner" class="hidden bg-yellow-50 border-l-4 border-yellow-400 p-4 mb-6">
+                <div class="flex">
+                    <div class="flex-shrink-0">
+                        <svg class="h-5 w-5 text-yellow-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                        </svg>
+                    </div>
+                    <div class="ml-3">
+                        <p class="text-sm font-medium text-yellow-800">More Shares Needed</p>
+                        <p class="text-sm text-yellow-700 mt-1" id="thresholdMessage">Upload more share files to meet the threshold.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Shares Table -->
+            <div class="overflow-x-auto mb-6">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Share ID</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Index</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Ceremony</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Fingerprint</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">File</th>
+                        </tr>
+                    </thead>
+                    <tbody id="sharesTableBody" class="bg-white divide-y divide-slate-200">
+                        <!-- Populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Reconstruct Button -->
+            <div class="flex justify-end">
+                <button onclick="reconstructKey()" id="reconstructBtn" disabled
+                        class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:bg-slate-300 disabled:cursor-not-allowed">
+                    <span id="reconstructBtnText">Reconstruct Master Key</span>
+                    <span id="reconstructBtnSpinner" class="hidden">
+                        <svg class="inline w-4 h-4 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Reconstructing...
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Result Section -->
+        <div id="resultSection" class="hidden bg-white border border-slate-200 rounded-lg p-8">
+            <h2 class="text-xl font-semibold text-slate-900 mb-4">Reconstruction Result</h2>
+
+            <div id="successResult" class="hidden">
+                <div class="bg-green-50 border-l-4 border-green-400 p-6 mb-6">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-6 w-6 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-4">
+                            <h3 class="text-lg font-semibold text-green-800 mb-2">Key Successfully Reconstructed!</h3>
+                            <p class="text-green-700" id="successMessage"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div class="border border-slate-200 rounded-lg p-4">
+                        <p class="text-xs text-slate-500 mb-1">Reconstructed Fingerprint</p>
+                        <p class="text-sm font-mono text-slate-900 break-all" id="reconstructedFingerprint"></p>
+                    </div>
+                    <div class="border border-slate-200 rounded-lg p-4">
+                        <p class="text-xs text-slate-500 mb-1">Original Fingerprint</p>
+                        <p class="text-sm font-mono text-slate-900 break-all" id="originalFingerprint"></p>
+                    </div>
+                    <div class="border border-slate-200 rounded-lg p-4">
+                        <p class="text-xs text-slate-500 mb-1">Ceremony Name</p>
+                        <p class="text-sm font-medium text-slate-900" id="ceremonyName"></p>
+                    </div>
+                    <div class="border border-slate-200 rounded-lg p-4">
+                        <p class="text-xs text-slate-500 mb-1">Shares Used</p>
+                        <p class="text-sm font-medium text-slate-900"><span id="sharesUsedCount"></span> shares (threshold: <span id="thresholdCount"></span>)</p>
+                    </div>
+                </div>
+
+                <div id="verifiedBadge" style="display: none;" class="inline-flex items-center px-4 py-2 rounded-lg bg-green-100 text-green-800 font-medium">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    Fingerprint Verified
+                </div>
+
+                <div id="notVerifiedBadge" style="display: none;" class="inline-flex items-center px-4 py-2 rounded-lg bg-yellow-100 text-yellow-800 font-medium">
+                    <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+                    </svg>
+                    No Original Fingerprint for Verification
+                </div>
+            </div>
+
+            <button onclick="resetForm()" class="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                Reconstruct Another Key
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let parsedShares = [];
+
+        function parseFiles() {
+            const fileInput = document.getElementById('shareFiles');
+            const files = fileInput.files;
+
+            if (files.length === 0) {
+                alert('Please select at least one share file');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+
+            const parseBtn = document.getElementById('parseBtn');
+            const parseBtnText = document.getElementById('parseBtnText');
+            const parseBtnSpinner = document.getElementById('parseBtnSpinner');
+
+            parseBtn.disabled = true;
+            parseBtnText.classList.add('hidden');
+            parseBtnSpinner.classList.remove('hidden');
+
+            fetch('/hsm/recovery/offline/parse', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    parsedShares = result.parsedShares;
+                    displayParsedShares(result);
+                } else {
+                    alert('Error parsing files: ' + result.error);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An unexpected error occurred');
+            })
+            .finally(() => {
+                parseBtn.disabled = false;
+                parseBtnText.classList.remove('hidden');
+                parseBtnSpinner.classList.add('hidden');
+            });
+        }
+
+        function displayParsedShares(result) {
+            document.getElementById('parsedSharesSection').classList.remove('hidden');
+            document.getElementById('resultSection').classList.add('hidden');
+
+            document.getElementById('sharesUploaded').textContent = result.sharesUploaded;
+            document.getElementById('sharesRequired').textContent = result.sharesRequired;
+
+            const progress = result.sharesRequired > 0 ? (result.sharesUploaded / result.sharesRequired) * 100 : 0;
+            document.getElementById('progressBar').style.width = Math.min(progress, 100) + '%';
+
+            if (result.canReconstruct) {
+                document.getElementById('thresholdMetBanner').classList.remove('hidden');
+                document.getElementById('thresholdNotMetBanner').classList.add('hidden');
+                document.getElementById('reconstructBtn').disabled = false;
+            } else {
+                document.getElementById('thresholdMetBanner').classList.add('hidden');
+                document.getElementById('thresholdNotMetBanner').classList.remove('hidden');
+                document.getElementById('thresholdMessage').textContent = result.message;
+                document.getElementById('reconstructBtn').disabled = true;
+            }
+
+            const tbody = document.getElementById('sharesTableBody');
+            tbody.innerHTML = '';
+
+            result.parsedShares.forEach(share => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-4 py-3 text-sm font-mono text-slate-900">${share.shareId}</td>
+                    <td class="px-4 py-3 text-sm text-slate-900">${share.shareIndex}</td>
+                    <td class="px-4 py-3 text-sm text-slate-600">${share.ceremonyName}</td>
+                    <td class="px-4 py-3 text-sm font-mono text-slate-600">${share.masterKeyFingerprint}</td>
+                    <td class="px-4 py-3 text-sm text-slate-500">${share.fileName}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        let currentPassphraseCollection = null;
+
+        async function reconstructKey() {
+            const fileInput = document.getElementById('shareFiles');
+            const files = fileInput.files;
+
+            // Prompt for passphrases for each file using modal
+            const passphrases = [];
+            try {
+                for (let i = 0; i < files.length; i++) {
+                    const passphrase = await showPassphraseModal(files[i].name, parsedShares[i]);
+                    if (!passphrase) {
+                        return; // User cancelled
+                    }
+                    passphrases.push(passphrase);
+                }
+            } catch (error) {
+                console.error('Error collecting passphrases:', error);
+                return;
+            }
+
+            if (!confirm('Reconstruct the master key from uploaded shares?')) {
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+                formData.append('passphrases', passphrases[i]);
+            }
+
+            const reconstructBtn = document.getElementById('reconstructBtn');
+            const reconstructBtnText = document.getElementById('reconstructBtnText');
+            const reconstructBtnSpinner = document.getElementById('reconstructBtnSpinner');
+
+            reconstructBtn.disabled = true;
+            reconstructBtnText.classList.add('hidden');
+            reconstructBtnSpinner.classList.remove('hidden');
+
+            fetch('/hsm/recovery/offline/reconstruct', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    displayResult(result);
+                } else {
+                    alert('Error reconstructing key: ' + result.error);
+                    reconstructBtn.disabled = false;
+                    reconstructBtnText.classList.remove('hidden');
+                    reconstructBtnSpinner.classList.add('hidden');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('An unexpected error occurred');
+                reconstructBtn.disabled = false;
+                reconstructBtnText.classList.remove('hidden');
+                reconstructBtnSpinner.classList.add('hidden');
+            });
+        }
+
+        function displayResult(result) {
+            console.log('Display result called with:', result);
+            console.log('result.verified:', result.verified, 'type:', typeof result.verified);
+
+            document.getElementById('parsedSharesSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.remove('hidden');
+            document.getElementById('successResult').classList.remove('hidden');
+
+            document.getElementById('successMessage').textContent = result.message;
+            document.getElementById('reconstructedFingerprint').textContent = result.reconstructedFingerprint;
+            document.getElementById('originalFingerprint').textContent = result.originalFingerprint;
+            document.getElementById('ceremonyName').textContent = result.ceremonyName;
+            document.getElementById('sharesUsedCount').textContent = result.sharesUsed;
+            document.getElementById('thresholdCount').textContent = result.threshold;
+
+            if (result.verified === true) {
+                console.log('Showing verified badge');
+                document.getElementById('verifiedBadge').style.display = 'inline-flex';
+                document.getElementById('notVerifiedBadge').style.display = 'none';
+            } else {
+                console.log('Showing NOT verified badge, verified value is:', result.verified);
+                document.getElementById('verifiedBadge').style.display = 'none';
+                document.getElementById('notVerifiedBadge').style.display = 'inline-flex';
+            }
+        }
+
+        function clearFiles() {
+            document.getElementById('shareFiles').value = '';
+            document.getElementById('parsedSharesSection').classList.add('hidden');
+            document.getElementById('resultSection').classList.add('hidden');
+            parsedShares = [];
+        }
+
+        function resetForm() {
+            clearFiles();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Passphrase Modal Functions
+        function showPassphraseModal(fileName, shareInfo) {
+            return new Promise((resolve, reject) => {
+                const modal = document.getElementById('passphraseModal');
+                const modalTitle = document.getElementById('modalTitle');
+                const modalDescription = document.getElementById('modalDescription');
+                const modalPassphrase = document.getElementById('modalPassphrase');
+
+                modalTitle.textContent = `Enter Passphrase for Share`;
+                if (shareInfo) {
+                    modalDescription.textContent = `File: ${fileName}\nCustodian: ${shareInfo.ceremonyName || 'Unknown'}`;
+                } else {
+                    modalDescription.textContent = `File: ${fileName}`;
+                }
+                modalPassphrase.value = '';
+                modal.classList.remove('hidden');
+                modalPassphrase.focus();
+
+                currentPassphraseCollection = { resolve, reject };
+
+                // Handle Enter key
+                modalPassphrase.onkeypress = (e) => {
+                    if (e.key === 'Enter') {
+                        submitModalPassphrase();
+                    }
+                };
+            });
+        }
+
+        function submitModalPassphrase() {
+            const modalPassphrase = document.getElementById('modalPassphrase');
+            const passphrase = modalPassphrase.value;
+
+            if (!passphrase) {
+                alert('Passphrase is required');
+                return;
+            }
+
+            hideModal();
+            if (currentPassphraseCollection) {
+                currentPassphraseCollection.resolve(passphrase);
+                currentPassphraseCollection = null;
+            }
+        }
+
+        function cancelModal() {
+            hideModal();
+            if (currentPassphraseCollection) {
+                currentPassphraseCollection.resolve(null);
+                currentPassphraseCollection = null;
+            }
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('passphraseModal');
+            modal.classList.add('hidden');
+            document.getElementById('modalPassphrase').value = '';
+        }
+
+        function toggleModalPassword() {
+            const field = document.getElementById('modalPassphrase');
+            field.type = field.type === 'password' ? 'text' : 'password';
+        }
+        // Modal needs to be inside the content fragment for Thymeleaf layout
+    </script>
+
+    <!-- Passphrase Modal (inside content fragment) -->
+    <div id="passphraseModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+    <div class="bg-slate-800 rounded-2xl p-8 max-w-md w-full mx-4 border border-slate-700">
+        <h3 class="text-2xl font-bold mb-4 text-white" id="modalTitle">Enter Passphrase</h3>
+        <p class="text-slate-300 mb-6" id="modalDescription">Enter the passphrase to decrypt this share file</p>
+
+        <div class="mb-6">
+            <label for="modalPassphrase" class="block text-sm font-medium text-slate-300 mb-2">
+                Passphrase <span class="text-red-400">*</span>
+            </label>
+            <div class="relative">
+                <input type="password" id="modalPassphrase" autocomplete="off"
+                       class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-blue-500">
+                <button type="button" onclick="toggleModalPassword()"
+                        class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                    <svg id="modalEyeIcon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                </button>
+            </div>
+            <p class="mt-2 text-sm text-slate-400">This is the passphrase used during the key ceremony</p>
+        </div>
+
+        <div class="flex space-x-4">
+            <button onclick="submitModalPassphrase()"
+                    class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                Continue
+            </button>
+            <button onclick="cancelModal()"
+                    class="px-6 py-3 border border-slate-600 text-slate-300 font-medium rounded-lg hover:bg-slate-700 transition-colors">
+                Cancel
+            </button>
+        </div>
+    </div>
+    </div>
+</div>
+</body>
+</html>

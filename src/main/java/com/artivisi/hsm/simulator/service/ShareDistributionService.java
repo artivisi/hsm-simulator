@@ -104,6 +104,7 @@ public class ShareDistributionService {
         content.append(String.format("Master Key ID:     %s\n", masterKey.getMasterKeyId()));
         content.append(String.format("Fingerprint:       %s\n", masterKey.getKeyFingerprint()));
         content.append(String.format("Status:            %s\n", masterKey.getStatus()));
+        content.append(String.format("KDF Salt:          %s\n", masterKey.getKdfSalt()));
         content.append("\n");
 
         content.append("CUSTODIAN INFORMATION\n");

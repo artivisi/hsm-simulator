@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -199,7 +200,7 @@ public class CeremonyService {
      * Generates the master key once threshold is met.
      */
     @Transactional
-    public MasterKey generateMasterKey(UUID ceremonyId, String initiatedBy) {
+    public MasterKey generateMasterKey(UUID ceremonyId, String initiatedBy, Map<String, String> custodianPassphrases) {
         log.info("Generating master key for ceremony: {}", ceremonyId);
 
         KeyCeremony ceremony = ceremonyRepository.findById(ceremonyId)
@@ -278,8 +279,24 @@ public class CeremonyService {
 
                 KeyGenerationService.ShamirShare shamirShare = shamirShares.get(shareIndex);
 
-                // Generate encryption key for this custodian's share
-                byte[] encryptionKey = deriveShareEncryptionKey(ceremonyCustodian, ceremony);
+                // Get custodian's passphrase for encrypting their share
+                String custodianEmail = ceremonyCustodian.getKeyCustodian().getEmail();
+                String passphrase = custodianPassphrases.get(custodianEmail);
+
+                if (passphrase == null) {
+                    throw new IllegalArgumentException("Missing passphrase for custodian: " + custodianEmail);
+                }
+
+                // Verify passphrase matches original contribution
+                PassphraseContribution contribution = contributionRepository.findByCeremonyCustodian(ceremonyCustodian)
+                        .orElseThrow(() -> new IllegalStateException("Contribution not found for custodian"));
+
+                if (!passphraseService.verifyPassphrase(passphrase, contribution.getPassphraseHash())) {
+                    throw new IllegalArgumentException("Invalid passphrase for custodian: " + custodianEmail);
+                }
+
+                // Derive encryption key from passphrase
+                byte[] encryptionKey = deriveEncryptionKeyFromPassphrase(passphrase);
 
                 // Encrypt the share
                 byte[] encryptedShareData = keyGenerationService.encryptShare(shamirShare, encryptionKey);
@@ -349,6 +366,7 @@ public class CeremonyService {
                     return CustodianStatusInfo.builder()
                             .custodianName(cc.getKeyCustodian().getFullName())
                             .custodianLabel(cc.getCustodianLabel())
+                            .custodianEmail(cc.getKeyCustodian().getEmail())
                             .contributionStatus(cc.getContributionStatus())
                             .contributedAt(cc.getContributedAt())
                             .contributionToken(cc.getContributionToken())
@@ -453,22 +471,34 @@ public class CeremonyService {
     }
 
     private String generateContributionLink(String token) {
-        // In production, use actual domain
-        return "https://hsm.local/hsm/contribute/" + token;
+        try {
+            // Build URL dynamically based on current request context
+            return ServletUriComponentsBuilder.fromCurrentContextPath()
+                    .path("/hsm/contribute/")
+                    .path(token)
+                    .build()
+                    .toUriString();
+        } catch (Exception e) {
+            // Fallback if no request context available (e.g., during async/background tasks)
+            log.warn("Unable to build URL from request context, using fallback");
+            return "http://localhost:8080/hsm/contribute/" + token;
+        }
     }
 
-    private byte[] deriveShareEncryptionKey(CeremonyCustodian ceremonyCustodian, KeyCeremony ceremony) {
-        // Derive a unique encryption key for each custodian's share
-        // Using ceremony ID + custodian email as seed
-        String seed = ceremony.getCeremonyId() + ":" + ceremonyCustodian.getKeyCustodian().getEmail();
-        byte[] salt = keyGenerationService.generateSalt();
+    /**
+     * Derives encryption key from custodian passphrase using PBKDF2
+     */
+    private byte[] deriveEncryptionKeyFromPassphrase(String passphrase) {
+        // Use a fixed salt for passphrase-based encryption
+        // This allows offline recovery with only the passphrase
+        byte[] salt = "HSM_SHARE_ENCRYPTION_SALT_V1".getBytes(java.nio.charset.StandardCharsets.UTF_8);
 
         try {
             javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
-            javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(seed.toCharArray(), salt, 10000, 256);
+            javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(passphrase.toCharArray(), salt, 100000, 256);
             return factory.generateSecret(spec).getEncoded();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to derive share encryption key", e);
+            throw new RuntimeException("Failed to derive encryption key from passphrase", e);
         }
     }
 
@@ -591,6 +621,7 @@ public class CeremonyService {
     public static class CustodianStatusInfo {
         private String custodianName;
         private String custodianLabel;
+        private String custodianEmail;
         private CeremonyCustodian.ContributionStatus contributionStatus;
         private LocalDateTime contributedAt;
         private String contributionToken;

@@ -99,18 +99,19 @@ public class ContributionController {
             PassphraseService.PassphraseValidationResult result =
                     passphraseService.validatePassphrase(request.getPassphrase());
 
-            return ResponseEntity.ok(Map.of(
-                    "valid", result.isValid(),
-                    "length", result.getLength(),
-                    "hasUppercase", result.isHasUppercase(),
-                    "hasLowercase", result.isHasLowercase(),
-                    "hasDigit", result.isHasDigit(),
-                    "hasSpecial", result.isHasSpecial(),
-                    "entropyScore", result.getEntropyScore() != null ? result.getEntropyScore() : BigDecimal.ZERO,
-                    "strength", result.getStrength() != null ? result.getStrength().name() : "WEAK",
-                    "meetsRecommendedLength", result.isMeetsRecommendedLength(),
-                    "errorMessage", result.getErrorMessage()
-            ));
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("valid", result.isValid());
+            response.put("length", result.getLength());
+            response.put("hasUppercase", result.isHasUppercase());
+            response.put("hasLowercase", result.isHasLowercase());
+            response.put("hasDigit", result.isHasDigit());
+            response.put("hasSpecial", result.isHasSpecial());
+            response.put("entropyScore", result.getEntropyScore() != null ? result.getEntropyScore() : BigDecimal.ZERO);
+            response.put("strength", result.getStrength() != null ? result.getStrength().name() : "WEAK");
+            response.put("meetsRecommendedLength", result.isMeetsRecommendedLength());
+            response.put("errorMessage", result.getErrorMessage() != null ? result.getErrorMessage() : "");
+
+            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
             log.error("Error validating passphrase", e);

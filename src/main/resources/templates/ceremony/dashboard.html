@@ -54,7 +54,7 @@
 
             <!-- Progress Bar -->
             <div class="mb-4">
-                <div class="flex justify-between text-sm text-slate-400 mb-2">
+                <div class="flex flex-col sm:flex-row sm:justify-between gap-2 text-sm text-slate-400 mb-2">
                     <span th:text="${contributedCount} + ' of ' + ${totalCustodians} + ' contributions (' + ${progressPercentage} + '%)'">2 of 3 contributions (67%)</span>
                     <span id="statusText" th:classappend="${thresholdMet} ? 'text-green-400 font-semibold' : 'text-slate-400'">
                         <span th:if="${thresholdMet}">✓ Threshold Met!</span>
@@ -87,7 +87,8 @@
             <div id="custodianList" class="space-y-4">
                 <div th:each="custodianStatus : ${custodianStatuses}"
                      class="bg-slate-900/30 border rounded-xl p-4"
-                     th:classappend="${custodianStatus.contributionStatus.name() == 'CONTRIBUTED'} ? 'border-green-700/50' : 'border-slate-700'">
+                     th:classappend="${custodianStatus.contributionStatus.name() == 'CONTRIBUTED'} ? 'border-green-700/50 custodian-contributed' : 'border-slate-700'"
+                     th:attr="data-custodian-email=${custodianStatus.custodianEmail}, data-custodian-name=${custodianStatus.custodianName}">
 
                     <!-- Custodian Header -->
                     <div class="flex items-center justify-between mb-3">
@@ -231,10 +232,33 @@
             }
         }
 
+        let currentPassphraseCollection = null;
+
         async function generateMasterKey() {
             const generateBtn = document.getElementById('generateKeyBtn');
             const btnText = document.getElementById('generateBtnText');
             const btnSpinner = document.getElementById('generateBtnSpinner');
+
+            // Collect passphrases from custodians who contributed
+            const custodianItems = document.querySelectorAll('.custodian-contributed');
+            const custodianPassphrases = {};
+
+            try {
+                for (const item of custodianItems) {
+                    const email = item.getAttribute('data-custodian-email');
+                    const name = item.getAttribute('data-custodian-name');
+
+                    const passphrase = await showPassphraseModal(name, email);
+                    if (!passphrase) {
+                        return; // User cancelled
+                    }
+
+                    custodianPassphrases[email] = passphrase;
+                }
+            } catch (error) {
+                console.error('Error collecting passphrases:', error);
+                return;
+            }
 
             generateBtn.disabled = true;
             btnText.classList.add('hidden');
@@ -242,7 +266,13 @@
 
             try {
                 const response = await fetch(`/api/ceremonies/${ceremonyId}/generate`, {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        custodianPassphrases: custodianPassphrases
+                    })
                 });
 
                 const result = await response.json();
@@ -295,6 +325,103 @@
                 clearInterval(pollingInterval);
             }
         });
+
+        // Passphrase Modal Functions
+        function showPassphraseModal(custodianName, email) {
+            return new Promise((resolve, reject) => {
+                const modal = document.getElementById('passphraseModal');
+                const modalTitle = document.getElementById('modalTitle');
+                const modalDescription = document.getElementById('modalDescription');
+                const modalPassphrase = document.getElementById('modalPassphrase');
+
+                modalTitle.textContent = `Enter Passphrase for ${custodianName}`;
+                modalDescription.textContent = `Email: ${email}`;
+                modalPassphrase.value = '';
+                modal.classList.remove('hidden');
+                modalPassphrase.focus();
+
+                currentPassphraseCollection = { resolve, reject };
+
+                // Handle Enter key
+                modalPassphrase.onkeypress = (e) => {
+                    if (e.key === 'Enter') {
+                        submitModalPassphrase();
+                    }
+                };
+            });
+        }
+
+        function submitModalPassphrase() {
+            const modalPassphrase = document.getElementById('modalPassphrase');
+            const passphrase = modalPassphrase.value;
+
+            if (!passphrase) {
+                alert('Passphrase is required');
+                return;
+            }
+
+            hideModal();
+            if (currentPassphraseCollection) {
+                currentPassphraseCollection.resolve(passphrase);
+                currentPassphraseCollection = null;
+            }
+        }
+
+        function cancelModal() {
+            hideModal();
+            if (currentPassphraseCollection) {
+                currentPassphraseCollection.resolve(null);
+                currentPassphraseCollection = null;
+            }
+        }
+
+        function hideModal() {
+            const modal = document.getElementById('passphraseModal');
+            modal.classList.add('hidden');
+            document.getElementById('modalPassphrase').value = '';
+        }
+
+        function toggleModalPassword() {
+            const field = document.getElementById('modalPassphrase');
+            field.type = field.type === 'password' ? 'text' : 'password';
+        }
     </script>
+
+    <!-- Passphrase Modal -->
+    <div id="passphraseModal" class="hidden fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50">
+        <div class="bg-slate-800 rounded-2xl p-8 max-w-md w-full mx-4 border border-slate-700">
+            <h3 class="text-2xl font-bold mb-4 text-white" id="modalTitle">Enter Passphrase</h3>
+            <p class="text-slate-300 mb-6" id="modalDescription">Enter the passphrase for this custodian</p>
+
+            <div class="mb-6">
+                <label for="modalPassphrase" class="block text-sm font-medium text-slate-300 mb-2">
+                    Passphrase <span class="text-red-400">*</span>
+                </label>
+                <div class="relative">
+                    <input type="password" id="modalPassphrase" autocomplete="off"
+                           class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 pr-12 text-white focus:outline-none focus:border-blue-500">
+                    <button type="button" onclick="toggleModalPassword()"
+                            class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                        <svg id="modalEyeIcon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                        </svg>
+                    </button>
+                </div>
+                <p class="mt-2 text-sm text-slate-400">This is the same passphrase you entered during contribution</p>
+            </div>
+
+            <div class="flex space-x-4">
+                <button onclick="submitModalPassphrase()"
+                        class="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                    Continue
+                </button>
+                <button onclick="cancelModal()"
+                        class="px-6 py-3 border border-slate-600 text-slate-300 font-medium rounded-lg hover:bg-slate-700 transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

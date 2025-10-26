@@ -48,14 +48,7 @@ public class PassphraseService {
 
         int length = passphrase.length();
 
-        if (length < MIN_LENGTH) {
-            return PassphraseValidationResult.builder()
-                    .valid(false)
-                    .errorMessage(String.format("Passphrase must be at least %d characters long", MIN_LENGTH))
-                    .length(length)
-                    .build();
-        }
-
+        // Always calculate character type checks and entropy
         boolean hasUppercase = UPPERCASE_PATTERN.matcher(passphrase).find();
         boolean hasLowercase = LOWERCASE_PATTERN.matcher(passphrase).find();
         boolean hasDigit = DIGIT_PATTERN.matcher(passphrase).find();
@@ -64,8 +57,14 @@ public class PassphraseService {
         BigDecimal entropyScore = calculateEntropy(passphrase, hasUppercase, hasLowercase, hasDigit, hasSpecial);
         PassphraseContribution.PassphraseStrength strength = determineStrength(entropyScore);
 
+        // Check if passphrase meets minimum length requirement
+        boolean isValid = length >= MIN_LENGTH;
+        String errorMessage = isValid ? null :
+            String.format("Passphrase must be at least %d characters long", MIN_LENGTH);
+
         return PassphraseValidationResult.builder()
-                .valid(true)
+                .valid(isValid)
+                .errorMessage(errorMessage)
                 .length(length)
                 .hasUppercase(hasUppercase)
                 .hasLowercase(hasLowercase)

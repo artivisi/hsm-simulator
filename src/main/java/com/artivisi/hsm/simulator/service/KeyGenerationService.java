@@ -426,13 +426,9 @@ public class KeyGenerationService {
     }
 
     private String formatFingerprint(byte[] bytes) {
-        String hex = bytesToHex(Arrays.copyOf(bytes, 12)); // Use first 12 bytes
-        StringBuilder formatted = new StringBuilder();
-        for (int i = 0; i < hex.length(); i += 4) {
-            if (i > 0) formatted.append(":");
-            formatted.append(hex, i, Math.min(i + 4, hex.length()));
-        }
-        return formatted.toString().toUpperCase();
+        // Use full SHA-256 hash (32 bytes = 64 hex characters) for complete fingerprint
+        String hex = bytesToHex(bytes);
+        return hex.toLowerCase(); // Return full hex string without formatting for better compatibility
     }
 
     private String bytesToHex(byte[] bytes) {
