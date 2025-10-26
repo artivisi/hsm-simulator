@@ -33,7 +33,16 @@ public class PinGenerationService {
      */
     @Transactional
     public GeneratedPin generatePin(UUID keyId, String accountNumber, Integer pinLength, String pinFormat) {
-        log.info("Generating PIN for account: {}, length: {}, format: {}", accountNumber, pinLength, pinFormat);
+        String clearPin = generateRandomPin(pinLength);
+        return generatePin(keyId, accountNumber, clearPin, pinFormat);
+    }
+
+    /**
+     * Encrypt a given PIN with the specified key (for API usage)
+     */
+    @Transactional
+    public GeneratedPin generatePin(UUID keyId, String accountNumber, String clearPin, String pinFormat) {
+        log.info("Generating PIN for account: {}, length: {}, format: {}", accountNumber, clearPin.length(), pinFormat);
 
         MasterKey encryptionKey = masterKeyRepository.findById(keyId)
                 .orElseThrow(() -> new IllegalArgumentException("Encryption key not found: " + keyId));
@@ -41,9 +50,6 @@ public class PinGenerationService {
         if (!isValidPinKey(encryptionKey)) {
             throw new IllegalArgumentException("Invalid key type for PIN encryption. Use LMK (storage), TPK (terminal), or ZPK (zone).");
         }
-
-        // Generate random PIN
-        String clearPin = generateRandomPin(pinLength);
 
         // Create PIN block based on format
         String pinBlock = createPinBlock(clearPin, accountNumber, pinFormat);
@@ -56,7 +62,7 @@ public class PinGenerationService {
 
         GeneratedPin generatedPin = GeneratedPin.builder()
                 .accountNumber(accountNumber)
-                .pinLength(pinLength)
+                .pinLength(clearPin.length())
                 .pinFormat(pinFormat)
                 .encryptedPinBlock(encryptedPinBlock)
                 .pinVerificationValue(pvv)
@@ -149,6 +155,7 @@ public class PinGenerationService {
             case "ISO-0" -> createISO0PinBlock(pin, accountNumber);
             case "ISO-1" -> createISO1PinBlock(pin);
             case "ISO-3" -> createISO3PinBlock(pin, accountNumber);
+            case "ISO-4" -> createISO4PinBlock(pin, accountNumber);
             default -> throw new IllegalArgumentException("Unsupported PIN format: " + format);
         };
     }
@@ -182,6 +189,20 @@ public class PinGenerationService {
             pinField += secureRandom.nextInt(10);
         }
 
+        String panField = "0000" + accountNumber.substring(accountNumber.length() - 13,
+                                                           accountNumber.length() - 1);
+
+        return xorHex(pinField, panField);
+    }
+
+    private String createISO4PinBlock(String pin, String accountNumber) {
+        // ISO Format 4: 4L[PIN][Random] XOR [PAN]
+        String pinField = String.format("4%d%s", pin.length(), pin);
+        while (pinField.length() < 16) {
+            pinField += Integer.toHexString(secureRandom.nextInt(16));
+        }
+
+        // Use last 16 digits of PAN for XOR
         String panField = "0000" + accountNumber.substring(accountNumber.length() - 13,
                                                            accountNumber.length() - 1);
 
