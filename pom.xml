@@ -155,6 +155,13 @@
 			<artifactId>bcprov-jdk18on</artifactId>
 			<version>1.79</version>
 		</dependency>
+
+		<!-- Mustache template engine for email templates -->
+		<dependency>
+			<groupId>com.github.spullara.mustache.java</groupId>
+			<artifactId>compiler</artifactId>
+			<version>0.9.14</version>
+		</dependency>
 	</dependencies>
 
 	<build>
