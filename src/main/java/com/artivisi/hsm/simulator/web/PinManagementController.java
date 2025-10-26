@@ -156,6 +156,33 @@ public class PinManagementController {
     }
 
     /**
+     * Show PIN translation form
+     */
+    @GetMapping("/{pinId}/translate")
+    public String showTranslateForm(
+            @PathVariable UUID pinId,
+            Model model
+    ) {
+        log.info("Showing translation form for PIN {}", pinId);
+
+        GeneratedPin pin = generatedPinRepository.findById(pinId)
+                .orElseThrow(() -> new IllegalArgumentException("PIN not found: " + pinId));
+
+        // Get available keys for translation (LMK, TPK, ZPK)
+        List<MasterKey> targetKeys = masterKeyRepository.findByStatus(MasterKey.KeyStatus.ACTIVE)
+                .stream()
+                .filter(k -> k.getKeyType() == KeyType.LMK ||
+                            k.getKeyType() == KeyType.TPK ||
+                            k.getKeyType() == KeyType.ZPK)
+                .filter(k -> !k.getId().equals(pin.getEncryptionKey().getId())) // Exclude current key
+                .toList();
+
+        model.addAttribute("pin", pin);
+        model.addAttribute("targetKeys", targetKeys);
+        return "pins/translate";
+    }
+
+    /**
      * Translate PIN from one key to another
      */
     @PostMapping("/api/translate")
@@ -169,13 +196,47 @@ public class PinManagementController {
                  principal.getName(), sourcePinId, targetKeyId);
 
         try {
+            GeneratedPin sourcePin = generatedPinRepository.findById(sourcePinId)
+                    .orElseThrow(() -> new IllegalArgumentException("Source PIN not found: " + sourcePinId));
+
+            MasterKey targetKey = masterKeyRepository.findById(targetKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("Target key not found: " + targetKeyId));
+
             String translatedPinBlock = pinGenerationService.translatePin(sourcePinId, targetKeyId);
 
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "PIN translated successfully",
-                    "encryptedPinBlock", translatedPinBlock
-            ));
+            // Calculate PIN block for visualization
+            String pinBlock = null;
+            String pinField = null;
+            String panField = null;
+
+            if ("ISO-0".equals(sourcePin.getPinFormat())) {
+                pinField = calculatePinField(sourcePin.getClearPin(), sourcePin.getPinLength());
+                panField = calculatePanField(sourcePin.getAccountNumber());
+                pinBlock = xorHex(pinField, panField);
+            } else if ("ISO-1".equals(sourcePin.getPinFormat())) {
+                pinField = "1" + sourcePin.getPinLength() + sourcePin.getClearPin();
+                while (pinField.length() < 16) {
+                    pinField += "R";
+                }
+                pinBlock = pinField;
+            }
+
+            Map<String, Object> response = new java.util.HashMap<>();
+            response.put("success", true);
+            response.put("message", "PIN translated successfully");
+            response.put("sourceKeyType", sourcePin.getEncryptionKey().getKeyType().toString());
+            response.put("sourceKeyId", sourcePin.getEncryptionKey().getMasterKeyId());
+            response.put("sourcePinBlock", sourcePin.getEncryptedPinBlock());
+            response.put("targetKeyType", targetKey.getKeyType().toString());
+            response.put("targetKeyId", targetKey.getMasterKeyId());
+            response.put("targetPinBlock", translatedPinBlock);
+            response.put("clearPinBlock", pinBlock != null ? pinBlock : "");
+            response.put("pinFormat", sourcePin.getPinFormat());
+            response.put("pinField", pinField != null ? pinField : "");
+            response.put("panField", panField != null ? panField : "");
+            response.put("accountNumber", sourcePin.getAccountNumber());
+
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Error translating PIN", e);
             return ResponseEntity.badRequest().body(Map.of(

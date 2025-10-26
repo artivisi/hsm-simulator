@@ -119,6 +119,10 @@
                                    class="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded transition-colors mr-2">
                                     Visualize
                                 </a>
+                                <a th:href="@{/pins/{id}/translate(id=${pin.id})}"
+                                   class="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-medium rounded transition-colors mr-2">
+                                    Translate
+                                </a>
                                 <form th:action="@{/pins/{id}/delete(id=${pin.id})}"
                                       method="post"
                                       style="display: inline;">
