@@ -83,7 +83,7 @@ INSERT INTO key_custodians (
     (
         'CUST-A-001',
         'Alice Johnson',
-        'alice.johnson@example.com',
+        'alice.johnson@yopmail.com',
         '+62-812-3456-7890',
         'IT Security',
         'ACTIVE',
@@ -92,7 +92,7 @@ INSERT INTO key_custodians (
     (
         'CUST-B-002',
         'Bob Williams',
-        'bob.williams@example.com',
+        'bob.williams@yopmail.com',
         '+62-812-3456-7891',
         'IT Security',
         'ACTIVE',
@@ -101,7 +101,7 @@ INSERT INTO key_custodians (
     (
         'CUST-C-003',
         'Carol Martinez',
-        'carol.martinez@example.com',
+        'carol.martinez@yopmail.com',
         '+62-812-3456-7892',
         'IT Security',
         'ACTIVE',
