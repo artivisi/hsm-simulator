@@ -31,6 +31,7 @@ public class CeremonyService {
 
     private final PassphraseService passphraseService;
     private final KeyGenerationService keyGenerationService;
+    private final EmailService emailService;
 
     /**
      * Creates a new key ceremony with selected custodians.
@@ -93,7 +94,11 @@ public class CeremonyService {
                     .contributionStatus(CeremonyCustodian.ContributionStatus.PENDING)
                     .build();
 
-            ceremonyCustodianRepository.save(ceremonyCustodian);
+            ceremonyCustodian = ceremonyCustodianRepository.save(ceremonyCustodian);
+
+            // Send invitation email to custodian
+            sendInvitationEmail(ceremonyCustodian, ceremony);
+
             order++;
         }
 
@@ -472,6 +477,161 @@ public class CeremonyService {
             result.append(String.format("%02x", b));
         }
         return result.toString();
+    }
+
+    /**
+     * Sends invitation email to custodian with contribution link
+     */
+    private void sendInvitationEmail(CeremonyCustodian ceremonyCustodian, KeyCeremony ceremony) {
+        String custodianName = ceremonyCustodian.getKeyCustodian().getFullName();
+        String custodianEmail = ceremonyCustodian.getKeyCustodian().getEmail();
+        String custodianLabel = ceremonyCustodian.getCustodianLabel();
+        String contributionLink = ceremonyCustodian.getContributionLink();
+
+        log.info("Sending invitation email to {} ({})", custodianName, custodianEmail);
+
+        String htmlContent = buildInvitationEmailHtml(
+                custodianName,
+                custodianLabel,
+                ceremony.getCeremonyName(),
+                ceremony.getPurpose(),
+                contributionLink,
+                ceremony.getContributionDeadline(),
+                ceremony.getThreshold(),
+                ceremony.getNumberOfCustodians()
+        );
+
+        try {
+            emailService.sendHtmlEmail(
+                    custodianEmail,
+                    "HSM Key Ceremony Invitation - " + ceremony.getCeremonyName(),
+                    htmlContent
+            );
+
+            // Update invitation sent timestamp
+            ceremonyCustodian.setInvitationSentAt(LocalDateTime.now());
+            ceremonyCustodianRepository.save(ceremonyCustodian);
+
+            if (emailService.isEmailEnabled()) {
+                log.info("Invitation email sent successfully to {}", custodianEmail);
+            } else {
+                log.info("Email sending disabled - simulated invitation to {}", custodianEmail);
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to send invitation email to {}: {}", custodianEmail, e.getMessage(), e);
+            // Don't fail ceremony creation if email fails
+        }
+    }
+
+    /**
+     * Builds HTML content for invitation email
+     */
+    private String buildInvitationEmailHtml(String custodianName, String custodianLabel,
+                                            String ceremonyName, String purpose,
+                                            String contributionLink, LocalDateTime deadline,
+                                            Integer threshold, Integer totalCustodians) {
+        String deadlineStr = deadline != null
+                ? deadline.format(java.time.format.DateTimeFormatter.ofPattern("MMMM dd, yyyy 'at' HH:mm"))
+                : "No deadline specified";
+
+        return """
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="UTF-8">
+                    <style>
+                        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                        .header { background: linear-gradient(135deg, #667eea 0%%, #764ba2 100%%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
+                        .content { background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb; }
+                        .info-box { background: white; padding: 20px; border-left: 4px solid #667eea; margin: 20px 0; border-radius: 4px; }
+                        .button { display: inline-block; background: #667eea; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
+                        .button:hover { background: #5568d3; }
+                        .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; border-radius: 4px; }
+                        .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+                        .detail-row { margin: 8px 0; }
+                        .detail-label { font-weight: bold; color: #4b5563; }
+                    </style>
+                </head>
+                <body>
+                    <div class="container">
+                        <div class="header">
+                            <h1 style="margin: 0;">🔐 HSM Key Ceremony Invitation</h1>
+                        </div>
+
+                        <div class="content">
+                            <p>Dear <strong>%s</strong> (%s),</p>
+
+                            <p>You have been selected as a key custodian for an important HSM (Hardware Security Module) key ceremony.</p>
+
+                            <div class="info-box">
+                                <h3 style="margin-top: 0; color: #667eea;">Ceremony Information</h3>
+                                <div class="detail-row">
+                                    <span class="detail-label">Ceremony Name:</span> %s
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Purpose:</span> %s
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Threshold:</span> %d of %d custodians required
+                                </div>
+                                <div class="detail-row">
+                                    <span class="detail-label">Deadline:</span> %s
+                                </div>
+                            </div>
+
+                            <div class="warning">
+                                <strong>⚠️ Important:</strong> Your participation is critical for the security of this ceremony. Please create a strong, memorable passphrase and store it securely.
+                            </div>
+
+                            <p style="text-align: center;">
+                                <a href="%s" class="button">Submit Your Contribution</a>
+                            </p>
+
+                            <p style="font-size: 12px; color: #6b7280;">
+                                If the button doesn't work, copy and paste this link into your browser:<br>
+                                <a href="%s" style="color: #667eea; word-break: break-all;">%s</a>
+                            </p>
+
+                            <h3>What You Need to Do:</h3>
+                            <ol>
+                                <li>Click the link above to access the contribution form</li>
+                                <li>Create a strong passphrase (minimum 12 characters, 20+ recommended)</li>
+                                <li>Confirm your passphrase and submit</li>
+                                <li>Store your passphrase securely - you'll need it for future recovery operations</li>
+                            </ol>
+
+                            <div class="info-box">
+                                <h3 style="margin-top: 0; color: #667eea;">Security Notes</h3>
+                                <ul style="margin: 0;">
+                                    <li>Do NOT share your passphrase with anyone</li>
+                                    <li>Use a password manager to store it securely</li>
+                                    <li>Your passphrase is NOT stored - only a cryptographic hash</li>
+                                    <li>You will receive your encrypted key share after the ceremony completes</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="footer">
+                            <p>This is an automated message from the HSM Simulator.<br>
+                            For questions, please contact your system administrator.</p>
+                            <p style="margin-top: 15px;">
+                                <strong>ArtiVisi Intermedia</strong><br>
+                                HSM Key Ceremony Management System
+                            </p>
+                        </div>
+                    </div>
+                </body>
+                </html>
+                """.formatted(
+                custodianName, custodianLabel,
+                ceremonyName, purpose,
+                threshold, totalCustodians,
+                deadlineStr,
+                contributionLink,
+                contributionLink, contributionLink
+        );
     }
 
     // ===== Request/Response Classes =====
