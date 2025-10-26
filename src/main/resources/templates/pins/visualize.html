@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>PIN Visualization</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold text-slate-900 mb-2">PIN Visualization</h1>
+                    <p class="text-slate-600">Educational breakdown of PIN components and encryption</p>
+                </div>
+                <a href="/pins" class="px-4 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors">
+                    Back to List
+                </a>
+            </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-lg font-semibold text-slate-900">Account Information</h2>
+            </div>
+            <div class="p-6 grid grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Account Number (PAN)</label>
+                    <code class="block px-4 py-3 bg-slate-100 text-slate-900 rounded font-mono text-lg font-bold" th:text="${pin.accountNumber}"></code>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">PIN Length</label>
+                    <code class="block px-4 py-3 bg-slate-100 text-slate-900 rounded font-mono text-lg font-bold" th:text="${pin.pinLength} + ' digits'"></code>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">PIN Format</label>
+                    <code class="block px-4 py-3 bg-slate-100 text-slate-900 rounded font-mono text-lg font-bold" th:text="${pin.pinFormat}"></code>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Status</label>
+                    <span th:if="${pin.status.name() == 'ACTIVE'}" class="inline-flex px-4 py-2 text-sm font-semibold rounded-full bg-green-100 text-green-800">
+                        Active
+                    </span>
+                    <span th:if="${pin.status.name() == 'BLOCKED'}" class="inline-flex px-4 py-2 text-sm font-semibold rounded-full bg-red-100 text-red-800">
+                        Blocked
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Clear PIN (Educational) -->
+        <div class="bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg overflow-hidden mb-6">
+            <div class="px-6 py-4 border-b border-green-200 bg-green-100">
+                <h2 class="text-lg font-semibold text-green-900 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                    </svg>
+                    Clear PIN (Plaintext) - Educational View Only
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="bg-white rounded-lg p-6 border-2 border-green-300">
+                    <div class="text-center">
+                        <p class="text-sm font-medium text-green-700 mb-3">CLEAR PIN VALUE</p>
+                        <code class="text-5xl font-bold text-green-900 font-mono tracking-widest" th:text="${pin.clearPin}"></code>
+                        <p class="text-sm text-green-600 mt-4">⚠️ In production, this would NEVER be stored or displayed</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PIN Block Construction -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
+            <div class="px-6 py-4 border-b border-slate-200 bg-blue-50">
+                <h2 class="text-lg font-semibold text-blue-900">PIN Block Construction</h2>
+                <p class="text-sm text-blue-700 mt-1">How the PIN is formatted before encryption</p>
+            </div>
+            <div class="p-6">
+                <div th:if="${pin.pinFormat == 'ISO-0'}">
+                    <h3 class="font-semibold text-slate-900 mb-4">ISO Format 0 (ISO 9564-1:2002)</h3>
+                    <div class="space-y-4">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p class="text-sm font-medium text-blue-900 mb-2">Step 1: PIN Field</p>
+                            <p class="text-sm text-blue-700 mb-2">Format: <code class="bg-white px-2 py-1 rounded">0L[PIN][F...]</code> (16 hex digits)</p>
+                            <div class="flex items-center gap-2 font-mono text-sm">
+                                <span class="px-3 py-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-900 font-bold">0</span>
+                                <span class="px-3 py-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-900 font-bold" th:text="${pin.pinLength}"></span>
+                                <span th:each="digit : ${#strings.arraySplit(pin.clearPin, '')}"
+                                      class="px-3 py-2 bg-green-100 border border-green-300 rounded text-green-900 font-bold"
+                                      th:text="${digit}"></span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">F</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">F</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">F</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">F</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">F</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">F</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">F</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">F</span>
+                            </div>
+                            <p class="text-xs text-blue-600 mt-2">
+                                <span class="inline-block w-4 h-4 bg-yellow-100 border border-yellow-300 rounded mr-1"></span> Control Field
+                                <span class="inline-block w-4 h-4 bg-green-100 border border-green-300 rounded ml-3 mr-1"></span> PIN Digits
+                                <span class="inline-block w-4 h-4 bg-slate-100 border border-slate-300 rounded ml-3 mr-1"></span> Padding
+                            </p>
+                        </div>
+
+                        <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                            <p class="text-sm font-medium text-purple-900 mb-2">Step 2: PAN Field</p>
+                            <p class="text-sm text-purple-700 mb-2">Format: <code class="bg-white px-2 py-1 rounded">0000[12 rightmost PAN digits excluding check digit]</code></p>
+                            <div class="flex items-center gap-2 font-mono text-sm">
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">0</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">0</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">0</span>
+                                <span class="px-3 py-2 bg-slate-100 border border-slate-300 rounded text-slate-700 font-bold">0</span>
+                                <span th:each="digit, iterStat : ${#strings.arraySplit(#strings.substring(pin.accountNumber, #strings.length(pin.accountNumber) - 13, #strings.length(pin.accountNumber) - 1), '')}"
+                                      class="px-3 py-2 bg-purple-100 border border-purple-300 rounded text-purple-900 font-bold"
+                                      th:text="${digit}"></span>
+                            </div>
+                        </div>
+
+                        <div class="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                            <p class="text-sm font-medium text-orange-900 mb-3">Step 3: XOR Operation</p>
+                            <div class="space-y-3">
+                                <div>
+                                    <p class="text-xs font-medium text-orange-700 mb-1">PIN Field:</p>
+                                    <div class="flex items-center gap-1 font-mono text-xs">
+                                        <span th:each="char : ${#strings.arraySplit(pinField, '')}"
+                                              class="px-2 py-1 bg-yellow-100 border border-yellow-300 rounded text-yellow-900 font-bold"
+                                              th:text="${char}"></span>
+                                    </div>
+                                </div>
+                                <div class="text-center text-orange-600 font-bold">⊕ (XOR)</div>
+                                <div>
+                                    <p class="text-xs font-medium text-orange-700 mb-1">PAN Field:</p>
+                                    <div class="flex items-center gap-1 font-mono text-xs">
+                                        <span th:each="char : ${#strings.arraySplit(panField, '')}"
+                                              class="px-2 py-1 bg-purple-100 border border-purple-300 rounded text-purple-900 font-bold"
+                                              th:text="${char}"></span>
+                                    </div>
+                                </div>
+                                <div class="text-center text-orange-600 font-bold">=</div>
+                                <div>
+                                    <p class="text-xs font-medium text-orange-700 mb-1">PIN Block (Result):</p>
+                                    <div class="flex items-center gap-1 font-mono text-xs">
+                                        <span th:each="char : ${#strings.arraySplit(pinBlock, '')}"
+                                              class="px-2 py-1 bg-green-100 border border-green-300 rounded text-green-900 font-bold"
+                                              th:text="${char}"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-xs text-orange-600 mt-3">💡 XOR Truth Table: 0⊕0=0, 0⊕1=1, 1⊕0=1, 1⊕1=0</p>
+                        </div>
+
+                        <!-- PIN Block Before Encryption -->
+                        <div class="bg-teal-50 border border-teal-200 rounded-lg p-4">
+                            <p class="text-sm font-medium text-teal-900 mb-2">PIN Block Before Encryption</p>
+                            <div class="bg-white rounded-lg p-4 border-2 border-teal-300">
+                                <p class="text-xs font-medium text-teal-700 mb-2">Unencrypted PIN Block (Hex):</p>
+                                <code class="block text-center text-2xl font-bold text-teal-900 font-mono tracking-wider" th:text="${pinBlock}"></code>
+                                <p class="text-xs text-teal-600 mt-3 text-center">⚠️ This value will be encrypted using the encryption key</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div th:if="${pin.pinFormat == 'ISO-1'}">
+                    <h3 class="font-semibold text-slate-900 mb-4">ISO Format 1 (ISO 9564-1:2002)</h3>
+                    <div class="space-y-4">
+                        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                            <p class="text-sm font-medium text-blue-900 mb-2">Format: <code class="bg-white px-2 py-1 rounded">1L[PIN][Random]</code></p>
+                            <p class="text-sm text-blue-700">PIN Block with random padding (no PAN required)</p>
+                            <div class="flex items-center gap-2 font-mono text-sm mt-3">
+                                <span class="px-3 py-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-900 font-bold">1</span>
+                                <span class="px-3 py-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-900 font-bold" th:text="${pin.pinLength}"></span>
+                                <span th:each="digit : ${#strings.arraySplit(pin.clearPin, '')}"
+                                      class="px-3 py-2 bg-green-100 border border-green-300 rounded text-green-900 font-bold"
+                                      th:text="${digit}"></span>
+                                <span class="px-3 py-2 bg-orange-100 border border-orange-300 rounded text-orange-900 font-bold">R</span>
+                                <span class="px-3 py-2 bg-orange-100 border border-orange-300 rounded text-orange-900 font-bold">R</span>
+                                <span class="px-3 py-2 bg-orange-100 border border-orange-300 rounded text-orange-900 font-bold">R</span>
+                                <span class="px-3 py-2 bg-orange-100 border border-orange-300 rounded text-orange-900 font-bold">R</span>
+                                <span class="px-3 py-2 bg-orange-100 border border-orange-300 rounded text-orange-900 font-bold">R</span>
+                                <span class="px-3 py-2 bg-orange-100 border border-orange-300 rounded text-orange-900 font-bold">R</span>
+                                <span class="px-3 py-2 bg-orange-100 border border-orange-300 rounded text-orange-900 font-bold">R</span>
+                                <span class="px-3 py-2 bg-orange-100 border border-orange-300 rounded text-orange-900 font-bold">R</span>
+                            </div>
+                            <p class="text-xs text-blue-600 mt-2">
+                                <span class="inline-block w-4 h-4 bg-orange-100 border border-orange-300 rounded mr-1"></span> Random hex digits
+                            </p>
+                        </div>
+
+                        <!-- PIN Block Before Encryption -->
+                        <div class="bg-teal-50 border border-teal-200 rounded-lg p-4">
+                            <p class="text-sm font-medium text-teal-900 mb-2">PIN Block Before Encryption</p>
+                            <div class="bg-white rounded-lg p-4 border-2 border-teal-300">
+                                <p class="text-xs font-medium text-teal-700 mb-2">Unencrypted PIN Block (Hex):</p>
+                                <code class="block text-center text-2xl font-bold text-teal-900 font-mono tracking-wider" th:text="${pinBlock}"></code>
+                                <p class="text-xs text-teal-600 mt-3 text-center">⚠️ This value will be encrypted using the encryption key</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div th:if="${pin.pinFormat == 'ISO-3'}">
+                    <h3 class="font-semibold text-slate-900 mb-4">ISO Format 3 (ISO 9564-1:2002)</h3>
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p class="text-sm font-medium text-blue-900 mb-2">Format: Similar to ISO-0 but with random padding</p>
+                        <p class="text-sm text-blue-700">Uses random digits instead of 'F' padding, then XOR with PAN</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Encrypted PIN Block -->
+        <div class="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-lg overflow-hidden mb-6">
+            <div class="px-6 py-4 border-b border-red-200 bg-red-100">
+                <h2 class="text-lg font-semibold text-red-900 flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                    </svg>
+                    Encrypted PIN Block
+                </h2>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <div class="bg-white rounded-lg p-6 border-2 border-red-300">
+                        <div class="grid grid-cols-2 gap-4 mb-4">
+                            <div>
+                                <p class="text-sm font-medium text-red-700 mb-2">Encryption Key Type</p>
+                                <code class="block px-4 py-2 bg-red-50 text-red-900 rounded font-mono text-sm font-bold" th:text="${pin.encryptionKey.keyType}"></code>
+                            </div>
+                            <div>
+                                <p class="text-sm font-medium text-red-700 mb-2">Key ID</p>
+                                <code class="block px-4 py-2 bg-red-50 text-red-900 rounded font-mono text-sm font-bold" th:text="${pin.encryptionKey.masterKeyId}"></code>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-sm font-medium text-red-700 mb-2">Encrypted PIN Block (Hex)</p>
+                            <code class="block px-4 py-3 bg-red-50 text-red-900 rounded font-mono text-sm font-bold break-all" th:text="${pin.encryptedPinBlock}"></code>
+                        </div>
+                        <p class="text-sm text-red-600 mt-4">🔒 This is what gets transmitted and stored securely</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- PIN Verification Value (PVV) -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
+            <div class="px-6 py-4 border-b border-slate-200 bg-indigo-50">
+                <h2 class="text-lg font-semibold text-indigo-900">PIN Verification Value (PVV)</h2>
+                <p class="text-sm text-indigo-700 mt-1">Used for offline PIN verification without decrypting the PIN</p>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <!-- PVV Calculation Steps -->
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 1: Concatenate PIN + PAN</p>
+                        <div class="bg-white rounded-lg p-4 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <p class="text-xs font-medium text-indigo-700 w-24">PIN:</p>
+                                <code class="px-3 py-2 bg-green-100 border border-green-300 rounded text-green-900 font-mono font-bold" th:text="${pin.clearPin}"></code>
+                            </div>
+                            <div class="text-center text-indigo-600 font-bold">+</div>
+                            <div class="flex items-center gap-2">
+                                <p class="text-xs font-medium text-indigo-700 w-24">PAN:</p>
+                                <code class="px-3 py-2 bg-purple-100 border border-purple-300 rounded text-purple-900 font-mono font-bold" th:text="${pin.accountNumber}"></code>
+                            </div>
+                            <div class="text-center text-indigo-600 font-bold">=</div>
+                            <div class="flex items-center gap-2">
+                                <p class="text-xs font-medium text-indigo-700 w-24">Combined:</p>
+                                <code class="px-3 py-2 bg-slate-100 rounded text-slate-900 font-mono font-bold text-sm" th:text="${pin.clearPin + pin.accountNumber}"></code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 2: Apply SHA-256 Hash</p>
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-xs text-indigo-700 mb-2">Hash Function:</p>
+                            <code class="block px-3 py-2 bg-slate-100 rounded text-slate-900 font-mono text-sm">SHA-256(<span th:text="${pin.clearPin + pin.accountNumber}"></span>)</code>
+                            <p class="text-xs text-indigo-600 mt-2">↓ produces 64-character hexadecimal hash</p>
+                        </div>
+                    </div>
+
+                    <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 3: Extract First 4 Digits</p>
+                        <div class="bg-white rounded-lg p-4">
+                            <p class="text-xs text-indigo-700 mb-2">Take first 4 numeric digits from hash bytes:</p>
+                            <div class="text-center mt-3">
+                                <code class="text-4xl font-bold text-indigo-900 font-mono tracking-widest" th:text="${pin.pinVerificationValue}"></code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Final PVV Value -->
+                    <div class="bg-gradient-to-r from-indigo-100 to-purple-100 border-2 border-indigo-300 rounded-lg p-6">
+                        <div class="text-center">
+                            <p class="text-sm font-medium text-indigo-700 mb-3">FINAL PVV VALUE</p>
+                            <code class="text-5xl font-bold text-indigo-900 font-mono tracking-widest" th:text="${pin.pinVerificationValue}"></code>
+                            <p class="text-sm text-indigo-600 mt-4">✓ Can be stored on card magnetic stripe for offline verification</p>
+                        </div>
+                    </div>
+
+                    <!-- Educational Note -->
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p class="text-sm font-semibold text-blue-900 mb-2">🎓 How PVV Works:</p>
+                        <ul class="text-sm text-blue-800 space-y-1 list-disc list-inside">
+                            <li>PVV allows PIN verification without decryption</li>
+                            <li>Terminal can verify PIN by computing PVV and comparing with stored value</li>
+                            <li>Used in offline scenarios (e.g., chip cards, ATMs without connection)</li>
+                            <li>More secure than storing encrypted PIN on card</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Metadata -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden mb-6">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-lg font-semibold text-slate-900">Metadata</h2>
+            </div>
+            <div class="p-6 grid grid-cols-2 gap-6">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Generated At</label>
+                    <code class="block px-4 py-2 bg-slate-100 text-slate-900 rounded font-mono text-sm font-bold" th:text="${#temporals.format(pin.generatedAt, 'yyyy-MM-dd HH:mm:ss')}"></code>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Verification Attempts</label>
+                    <code class="block px-4 py-2 bg-slate-100 text-slate-900 rounded font-mono text-sm font-bold" th:text="${pin.verificationAttempts}"></code>
+                </div>
+                <div th:if="${pin.lastVerifiedAt != null}">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Last Verified At</label>
+                    <code class="block px-4 py-2 bg-slate-100 text-slate-900 rounded font-mono text-sm font-bold" th:text="${#temporals.format(pin.lastVerifiedAt, 'yyyy-MM-dd HH:mm:ss')}"></code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Educational Notes -->
+        <div class="bg-amber-50 border-2 border-amber-200 rounded-lg p-6">
+            <h3 class="font-semibold text-amber-900 mb-3 flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                </svg>
+                Educational Notes
+            </h3>
+            <div class="text-sm text-amber-800 space-y-2">
+                <p><strong>⚠️ For Educational Purposes Only:</strong> This visualization shows both encrypted and plaintext values to demonstrate how PIN encryption works in HSM systems.</p>
+                <p><strong>🔒 Production Systems:</strong> In real HSM systems, the clear PIN would NEVER be stored or displayed. Only the encrypted PIN block would exist.</p>
+                <p><strong>🎓 Learning Points:</strong></p>
+                <ul class="list-disc list-inside ml-4 space-y-1">
+                    <li>PINs are formatted into PIN blocks before encryption</li>
+                    <li>Different ISO formats provide different security characteristics</li>
+                    <li>Encryption keys (LMK, TPK, ZPK) serve different purposes</li>
+                    <li>PVV allows offline verification without decrypting the PIN</li>
+                    <li>The encrypted PIN block is what gets transmitted in payment networks</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

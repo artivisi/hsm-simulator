@@ -186,6 +186,66 @@ public class PinManagementController {
     }
 
     /**
+     * View PIN details with visualization
+     */
+    @GetMapping("/{pinId}/visualize")
+    public String visualizePin(
+            @PathVariable UUID pinId,
+            Model model
+    ) {
+        log.info("Visualizing PIN {}", pinId);
+
+        GeneratedPin pin = generatedPinRepository.findById(pinId)
+                .orElseThrow(() -> new IllegalArgumentException("PIN not found: " + pinId));
+
+        // Calculate PIN block components for visualization
+        if ("ISO-0".equals(pin.getPinFormat())) {
+            String pinField = calculatePinField(pin.getClearPin(), pin.getPinLength());
+            String panField = calculatePanField(pin.getAccountNumber());
+            String pinBlock = xorHex(pinField, panField);
+
+            model.addAttribute("pinField", pinField);
+            model.addAttribute("panField", panField);
+            model.addAttribute("pinBlock", pinBlock);
+        } else if ("ISO-1".equals(pin.getPinFormat())) {
+            String pinField = "1" + pin.getPinLength() + pin.getClearPin();
+            // Pad with random (we'll just show placeholder)
+            while (pinField.length() < 16) {
+                pinField += "R";
+            }
+            model.addAttribute("pinField", pinField);
+            model.addAttribute("pinBlock", pinField);
+        }
+
+        model.addAttribute("pin", pin);
+        return "pins/visualize";
+    }
+
+    private String calculatePinField(String pin, int length) {
+        String pinField = String.format("0%d%s", length, pin);
+        while (pinField.length() < 16) {
+            pinField += "F";
+        }
+        return pinField.toUpperCase();
+    }
+
+    private String calculatePanField(String accountNumber) {
+        String panField = "0000" + accountNumber.substring(accountNumber.length() - 13,
+                accountNumber.length() - 1);
+        return panField.toUpperCase();
+    }
+
+    private String xorHex(String hex1, String hex2) {
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < Math.min(hex1.length(), hex2.length()); i++) {
+            int val1 = Character.digit(hex1.charAt(i), 16);
+            int val2 = Character.digit(hex2.charAt(i), 16);
+            result.append(Integer.toHexString(val1 ^ val2));
+        }
+        return result.toString().toUpperCase();
+    }
+
+    /**
      * Delete a PIN
      */
     @PostMapping("/{pinId}/delete")
