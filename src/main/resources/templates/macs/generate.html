@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Generate MAC</title>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Generate MAC</h1>
+            <p class="text-slate-600">Generate Message Authentication Code for transaction integrity and authentication</p>
+        </div>
+
+        <!-- Educational Info -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <div class="flex items-start gap-3">
+                <svg class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div class="text-sm text-blue-900">
+                    <p class="font-semibold mb-2">What is a MAC?</p>
+                    <ul class="space-y-1 ml-4 list-disc">
+                        <li><strong>Message Authentication Code:</strong> Cryptographic checksum that verifies message integrity and authenticity</li>
+                        <li><strong>TSK (Terminal Security Key):</strong> Used for MACs on terminal-to-switch messages (ATM/POS transactions)</li>
+                        <li><strong>ZSK (Zone Session Key):</strong> Used for MACs on inter-bank messages (network transactions)</li>
+                        <li><strong>ISO 9797-1 Alg 3:</strong> Retail MAC standard used in payment industry</li>
+                        <li><strong>HMAC-SHA256:</strong> Modern MAC using SHA-256 hash function</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Generation Form -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-lg font-semibold text-slate-900">MAC Generation Parameters</h2>
+            </div>
+
+            <form id="macGenerationForm" onsubmit="generateMAC(event)" class="p-8">
+                <div class="space-y-6">
+                    <!-- MAC Key Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            MAC Key <span class="text-red-600">*</span>
+                        </label>
+                        <select name="keyId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                            <option value="">Select MAC key...</option>
+                            <option th:each="key : ${macKeys}"
+                                    th:value="${key.id}"
+                                    th:text="${key.keyType + ' - ' + key.masterKeyId}"></option>
+                        </select>
+                        <div class="mt-2 text-sm text-slate-600 space-y-1">
+                            <p><strong>TSK (Terminal Security Key):</strong> For terminal transaction authentication</p>
+                            <p><strong>ZSK (Zone Session Key):</strong> For inter-bank message authentication</p>
+                        </div>
+                    </div>
+
+                    <!-- Message Input -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            Message <span class="text-red-600">*</span>
+                        </label>
+                        <textarea
+                                name="message"
+                                required
+                                rows="5"
+                                class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900 font-mono text-sm"
+                                placeholder="Enter the message to generate MAC for...&#10;Example: ISO8583 message, transaction data, or any text"></textarea>
+                        <p class="mt-1 text-sm text-slate-500">Enter the message or transaction data to authenticate</p>
+                    </div>
+
+                    <!-- MAC Algorithm -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            MAC Algorithm <span class="text-red-600">*</span>
+                        </label>
+                        <select name="algorithm" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                            <option value="ISO9797-ALG3" selected>ISO 9797-1 Algorithm 3 (Retail MAC)</option>
+                            <option value="HMAC-SHA256">HMAC-SHA256</option>
+                            <option value="CBC-MAC">CBC-MAC (DES-based)</option>
+                        </select>
+                        <div class="mt-2 text-sm text-slate-600 space-y-1">
+                            <p><strong>ISO 9797-1 Alg 3:</strong> Industry standard for payment transactions</p>
+                            <p><strong>HMAC-SHA256:</strong> Modern cryptographic hash-based MAC</p>
+                            <p><strong>CBC-MAC:</strong> Classic DES-based MAC algorithm</p>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button type="submit"
+                            class="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
+                        Generate MAC
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Result Display -->
+        <div id="resultContainer" class="hidden mt-8 bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-green-50">
+                <h2 class="text-lg font-semibold text-green-900">MAC Generated Successfully</h2>
+            </div>
+            <div class="p-8 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">MAC Value:</label>
+                    <code id="resultMacValue" class="block px-4 py-2 bg-green-100 text-green-900 rounded font-mono text-lg font-bold"></code>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Algorithm:</label>
+                        <code id="resultAlgorithm" class="block px-4 py-2 bg-slate-100 text-slate-900 rounded font-mono text-sm font-bold"></code>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Message Length:</label>
+                        <code id="resultMessageLength" class="block px-4 py-2 bg-slate-100 text-slate-900 rounded font-mono text-sm font-bold"></code>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <a href="/macs" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                        View All MACs
+                    </a>
+                    <button onclick="generateAnother()" class="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors">
+                        Generate Another
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        async function generateMAC(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            // Get CSRF token
+            const token = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            const header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+            try {
+                const response = await fetch('/macs/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        [header]: token,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Display results
+                    document.getElementById('resultMacValue').textContent = result.macValue;
+                    document.getElementById('resultAlgorithm').textContent = result.algorithm;
+                    document.getElementById('resultMessageLength').textContent = result.messageLength + ' bytes';
+
+                    document.getElementById('resultContainer').classList.remove('hidden');
+                    form.reset();
+
+                    // Scroll to results
+                    document.getElementById('resultContainer').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An unexpected error occurred');
+            }
+        }
+
+        function generateAnother() {
+            document.getElementById('resultContainer').classList.add('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</div>
+</body>
+</html>

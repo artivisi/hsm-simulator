@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Verify MAC</title>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Verify MAC</h1>
+            <p class="text-slate-600">Verify Message Authentication Code to ensure message integrity and authenticity</p>
+        </div>
+
+        <!-- Educational Info -->
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
+            <div class="flex items-start gap-3">
+                <svg class="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+                <div class="text-sm text-blue-900">
+                    <p class="font-semibold mb-2">MAC Verification Process</p>
+                    <ul class="space-y-1 ml-4 list-disc">
+                        <li><strong>Step 1:</strong> Receive message and MAC value from sender</li>
+                        <li><strong>Step 2:</strong> Recalculate MAC using same key and algorithm</li>
+                        <li><strong>Step 3:</strong> Compare calculated MAC with received MAC</li>
+                        <li><strong>Result:</strong> Match = authentic & intact, Mismatch = tampered or forged</li>
+                        <li><strong>Security:</strong> MAC verification detects any message modification</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Verification Form -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-lg font-semibold text-slate-900">MAC Verification Parameters</h2>
+            </div>
+
+            <form id="macVerificationForm" onsubmit="verifyMAC(event)" class="p-8">
+                <div class="space-y-6">
+                    <!-- MAC Key Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            MAC Key <span class="text-red-600">*</span>
+                        </label>
+                        <select name="keyId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                            <option value="">Select MAC key...</option>
+                            <option th:each="key : ${macKeys}"
+                                    th:value="${key.id}"
+                                    th:text="${key.keyType + ' - ' + key.masterKeyId}"></option>
+                        </select>
+                        <p class="mt-1 text-sm text-slate-500">Use the same key that was used to generate the MAC</p>
+                    </div>
+
+                    <!-- Message Input -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            Message <span class="text-red-600">*</span>
+                        </label>
+                        <textarea
+                                name="message"
+                                required
+                                rows="5"
+                                class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900 font-mono text-sm"
+                                placeholder="Enter the original message to verify..."></textarea>
+                        <p class="mt-1 text-sm text-slate-500">Enter the exact message that was authenticated</p>
+                    </div>
+
+                    <!-- MAC Value Input -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            MAC Value <span class="text-red-600">*</span>
+                        </label>
+                        <input type="text"
+                               name="mac"
+                               required
+                               pattern="[0-9A-Fa-f]{16}"
+                               maxlength="16"
+                               class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900 font-mono"
+                               placeholder="ABCD1234EFGH5678">
+                        <p class="mt-1 text-sm text-slate-500">Enter the 16-character hexadecimal MAC value to verify</p>
+                    </div>
+
+                    <!-- MAC Algorithm -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            MAC Algorithm <span class="text-red-600">*</span>
+                        </label>
+                        <select name="algorithm" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                            <option value="ISO9797-ALG3" selected>ISO 9797-1 Algorithm 3 (Retail MAC)</option>
+                            <option value="HMAC-SHA256">HMAC-SHA256</option>
+                            <option value="CBC-MAC">CBC-MAC (DES-based)</option>
+                        </select>
+                        <p class="mt-1 text-sm text-slate-500">Use the same algorithm that was used to generate the MAC</p>
+                    </div>
+
+                    <!-- Verify Button -->
+                    <button type="submit"
+                            class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                        Verify MAC
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Result Display -->
+        <div id="resultContainer" class="hidden mt-8 bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div id="resultHeader" class="px-6 py-4 border-b border-slate-200">
+                <h2 id="resultTitle" class="text-lg font-semibold"></h2>
+            </div>
+            <div class="p-8 space-y-4">
+                <div id="successResult" class="hidden">
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <div class="text-sm text-green-900">
+                                <p class="font-semibold">MAC Verification Successful</p>
+                                <p>The message is authentic and has not been tampered with.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="failureResult" class="hidden">
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                        <div class="flex items-center gap-3">
+                            <svg class="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <div class="text-sm text-red-900">
+                                <p class="font-semibold">MAC Verification Failed</p>
+                                <p>The MAC does not match. The message may have been tampered with or the wrong key/algorithm was used.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex gap-3 pt-4">
+                    <a href="/macs" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                        View All MACs
+                    </a>
+                    <button onclick="verifyAnother()" class="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors">
+                        Verify Another
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        async function verifyMAC(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            // Get CSRF token
+            const token = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            const header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+            try {
+                const response = await fetch('/macs/api/verify', {
+                    method: 'POST',
+                    headers: {
+                        [header]: token,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    const resultHeader = document.getElementById('resultHeader');
+                    const resultTitle = document.getElementById('resultTitle');
+                    const successResult = document.getElementById('successResult');
+                    const failureResult = document.getElementById('failureResult');
+
+                    if (result.valid) {
+                        resultHeader.className = 'px-6 py-4 border-b border-slate-200 bg-green-50';
+                        resultTitle.className = 'text-lg font-semibold text-green-900';
+                        resultTitle.textContent = '✓ MAC Valid';
+                        successResult.classList.remove('hidden');
+                        failureResult.classList.add('hidden');
+                    } else {
+                        resultHeader.className = 'px-6 py-4 border-b border-slate-200 bg-red-50';
+                        resultTitle.className = 'text-lg font-semibold text-red-900';
+                        resultTitle.textContent = '✗ MAC Invalid';
+                        successResult.classList.add('hidden');
+                        failureResult.classList.remove('hidden');
+                    }
+
+                    document.getElementById('resultContainer').classList.remove('hidden');
+
+                    // Scroll to results
+                    document.getElementById('resultContainer').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An unexpected error occurred');
+            }
+        }
+
+        function verifyAnother() {
+            document.getElementById('resultContainer').classList.add('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</div>
+</body>
+</html>

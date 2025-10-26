@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>MAC Management</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">MAC Management</h1>
+                <p class="text-slate-600">Generate and verify Message Authentication Codes for transaction integrity</p>
+            </div>
+            <div class="flex gap-3">
+                <a href="/macs/generate" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
+                    + Generate MAC
+                </a>
+                <a href="/macs/verify" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                    Verify MAC
+                </a>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Total MACs</span>
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${totalMacs}">0</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Active MACs</span>
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${activeMacs}">0</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Expired MACs</span>
+                    <div class="w-10 h-10 bg-slate-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${expiredMacs}">0</p>
+            </div>
+        </div>
+
+        <!-- MACs Table -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-lg font-semibold text-slate-900">Generated MACs</h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Message</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Length</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">MAC Value</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Algorithm</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">MAC Key</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Verifications</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Generated</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-slate-200">
+                        <tr th:if="${macsPage.empty}">
+                            <td colspan="9" class="px-6 py-8 text-center text-slate-500">
+                                No MACs generated yet. Click "Generate MAC" to create one.
+                            </td>
+                        </tr>
+                        <tr th:each="mac : ${macsPage.content}" class="hover:bg-slate-50">
+                            <td class="px-6 py-4">
+                                <div class="text-sm font-mono text-slate-900 truncate max-w-xs" th:text="${mac.message}" th:title="${mac.message}"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900" th:text="${mac.messageLength}"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <code class="px-2 py-1 bg-slate-100 text-slate-900 rounded font-mono text-sm font-bold" th:text="${mac.macValue}"></code>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800" th:text="${mac.macAlgorithm}"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-xs font-mono text-slate-600" th:text="${mac.macKey.keyType + ' - ' + mac.macKey.masterKeyId}"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span th:if="${mac.status.name() == 'ACTIVE'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Active
+                                </span>
+                                <span th:if="${mac.status.name() == 'EXPIRED'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">
+                                    Expired
+                                </span>
+                                <span th:if="${mac.status.name() == 'REVOKED'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Revoked
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900" th:text="${mac.verificationAttempts}"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600" th:text="${#temporals.format(mac.generatedAt, 'yyyy-MM-dd HH:mm')}"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <form th:action="@{/macs/{id}/delete(id=${mac.id})}"
+                                      method="post"
+                                      style="display: inline;">
+                                    <button type="submit"
+                                            onclick="return confirm('Are you sure you want to delete this MAC? This action cannot be undone.');"
+                                            class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
