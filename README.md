@@ -35,6 +35,39 @@ mvn spring-boot:run
 ### 3. Access Application
 Buka browser: `http://localhost:8080`
 
+## 📖 Dokumentasi
+
+### REST API Documentation
+Dokumentasi lengkap REST API untuk integrasi workshop dan external systems tersedia di:
+- **[API.md](API.md)** - Complete REST API reference dengan request/response examples, cURL commands, dan Java integration code
+
+**API Endpoints:**
+- `POST /api/hsm/pin/encrypt` - Encrypt PIN block (ISO-0, ISO-1, ISO-3, ISO-4)
+- `POST /api/hsm/pin/verify` - Verify PIN against stored value
+- `POST /api/hsm/mac/generate` - Generate MAC (ISO9797-ALG3, HMAC-SHA256, CBC-MAC)
+- `POST /api/hsm/mac/verify` - Verify MAC authenticity
+- `POST /api/hsm/key/generate` - Generate cryptographic key (ZMK, TMK)
+- `POST /api/hsm/key/exchange` - Exchange key between encryption domains
+
+**Workshop Integration:**
+HSM Simulator menyediakan REST API yang kompatibel dengan [training-spring-jpos-2025](https://github.com/artivisi/training-spring-jpos-2025) workshop:
+- ✅ All required PIN formats (ISO-0, ISO-1, ISO-3, ISO-4)
+- ✅ MAC operations untuk transaction integrity
+- ✅ Key exchange untuk inter-bank communication
+- ✅ ZAK dan TEK support (mapped to ZSK internally)
+- ✅ Complete API documentation dengan Java integration examples
+
+### Database Schema Documentation
+Dokumentasi lengkap database schema dengan ERD, table specifications, dan sample queries:
+- **[DATABASE.md](DATABASE.md)** - Complete database schema documentation
+
+**Includes:**
+- 14 tables dengan full column specifications
+- Entity Relationship Diagram (ERD)
+- Indexes dan performance optimization
+- Sample queries untuk common operations
+- Backup, security, dan monitoring guidelines
+
 ## Fitur Utama
 
 ### 🏗️ Platform Lengkap
@@ -45,10 +78,17 @@ Buka browser: `http://localhost:8080`
 
 ### 🔐 Operasi Kriptografi
 - **Manajemen Kunci**: Generate, import, export, dan rotasi kunci kriptografi
-- **PIN Operations**: Pembuatan, verifikasi, dan translation PIN block (ISO-0, ISO-1, ISO-2, ISO-3)
-- **Enkripsi/Dekripsi**: Support 3DES, AES untuk data transaksi
-- **Digital Signature**: Pembuatan dan verifikasi tanda tangan digital
+- **PIN Operations**: Pembuatan, verifikasi, dan translation PIN block (ISO-0, ISO-1, ISO-3, ISO-4)
+  - PIN Generation: Generate random PIN dengan berbagai panjang (4-12 digit)
+  - PIN Verification: Verifikasi PIN dengan tracking failed attempts
+  - PIN Translation: Re-encrypt PIN dari satu key ke key lain dengan visualisasi 3-step
+  - Format Support: ISO Format 0, 1, 3, 4 sesuai ISO 9564-1:2002
 - **MAC Operations**: Message Authentication Code untuk integritas data
+  - ISO 9797-1 Algorithm 3 (Retail MAC, compatible with ANSI X9.19)
+  - HMAC-SHA256 untuk keamanan modern
+  - CBC-MAC untuk legacy systems
+  - MAC Generation & Verification dengan audit trail
+- **REST API**: Endpoint lengkap untuk integrasi workshop dan external systems
 
 ### 🌐 Arsitektur Perbankan
 - **Multi-Zone Support**: Manajemen kunci untuk Acquirer, Issuer, dan Switch
@@ -232,6 +272,25 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
    - ARQC (Application Request Cryptogram) generation
    - AAC (Application Authentication Cryptogram) verification
 
+### Key Types Reference
+
+HSM Simulator mendukung berbagai jenis kunci kriptografi untuk operasi perbankan:
+
+| Key Type | Description | Usage | Parent Key |
+|----------|-------------|-------|------------|
+| **LMK** | Local Master Key | PIN storage encryption in HSM database | - |
+| **TMK** | Terminal Master Key | Encrypts key distribution to terminals | - |
+| **TPK** | Terminal PIN Key | Encrypts PIN blocks at terminal level | TMK |
+| **TSK** | Terminal Security Key | MAC for terminal messages | TMK |
+| **ZMK** | Zone Master Key | Encrypts inter-bank key exchanges | - |
+| **ZPK** | Zone PIN Key | Protects PIN data between banks | ZMK |
+| **ZSK** | Zone Session Key | Encrypts inter-bank messages | ZMK |
+| **ZAK** | Zone Authentication Key | Workshop alias for ZSK (MAC operations) | ZMK |
+| **TEK** | Traffic Encryption Key | Workshop alias for ZSK (message encryption) | ZMK |
+| **KEK** | Key Encryption Key | Generic key encryption key | - |
+
+**Note**: ZAK dan TEK keduanya di-map ke ZSK secara internal untuk kompatibilitas dengan workshop training.
+
 ### Penggunaan Kunci dalam Arsitektur
 
 #### 1. TMK (Terminal Master Key)
@@ -298,6 +357,57 @@ Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan de
 
 ---
 
+## 🎯 Features Summary
+
+### ✅ Implemented Features
+
+#### Core HSM Operations
+- ✅ **Key Ceremony System** - Multi-custodian key initialization with Shamir's Secret Sharing (2-of-3 threshold)
+- ✅ **Master Key Generation** - Generate ZMK and TMK with configurable key sizes (128, 192, 256 bits)
+- ✅ **Key Hierarchy Management** - Parent-child relationships (TMK→TPK/TSK, ZMK→ZPK/ZSK)
+- ✅ **Key Rotation** - Complete audit trail with rotation history
+
+#### PIN Operations
+- ✅ **PIN Generation** - Random PIN generation with lengths 4-12 digits
+- ✅ **PIN Encryption** - Support for ISO-0, ISO-1, ISO-3, ISO-4 formats (ISO 9564-1:2002)
+- ✅ **PIN Verification** - With failed attempt tracking and auto-blocking after 3 failures
+- ✅ **PIN Translation** - Re-encrypt PIN from one key to another with educational visualization
+- ✅ **PVV Generation** - PIN Verification Value for offline validation
+
+#### MAC Operations
+- ✅ **MAC Generation** - ISO 9797-1 Algorithm 3 (Retail MAC, ANSI X9.19 compatible)
+- ✅ **HMAC-SHA256** - Modern MAC with SHA-256
+- ✅ **CBC-MAC** - Legacy DES-based MAC
+- ✅ **MAC Verification** - With attempt tracking and audit trail
+
+#### REST API for Integration
+- ✅ **PIN Encrypt API** - `/api/hsm/pin/encrypt` with all ISO formats
+- ✅ **PIN Verify API** - `/api/hsm/pin/verify` with status tracking
+- ✅ **MAC Generate API** - `/api/hsm/mac/generate` with 3 algorithms
+- ✅ **MAC Verify API** - `/api/hsm/mac/verify` with tamper detection
+- ✅ **Key Generate API** - `/api/hsm/key/generate` for ZMK and TMK
+- ✅ **Key Exchange API** - `/api/hsm/key/exchange` with KCV calculation
+
+#### Banking Infrastructure
+- ✅ **Four-Party Model** - Banks (ISSUER, ACQUIRER, SWITCH, PROCESSOR)
+- ✅ **Terminal Management** - ATM, POS, MPOS, E-COMMERCE terminal types
+- ✅ **Zone Key Exchange** - Inter-bank key distribution tracking
+- ✅ **Key Types Support** - LMK, TMK, TPK, TSK, ZMK, ZPK, ZSK, ZAK, TEK, KEK
+
+#### User Interface
+- ✅ **Web Dashboard** - Real-time statistics and monitoring
+- ✅ **Key Management UI** - Generate, view, and manage keys
+- ✅ **PIN Operations UI** - Generate, verify, and translate PINs with visualization
+- ✅ **MAC Operations UI** - Generate and verify MACs with educational notes
+- ✅ **Educational Mode** - Step-by-step visualization of cryptographic operations
+
+#### Database & Documentation
+- ✅ **PostgreSQL 17** - With Flyway migrations (5 versions)
+- ✅ **14 Tables** - Complete schema for HSM operations
+- ✅ **REST API Documentation** - Complete with examples (API.md)
+- ✅ **Database Documentation** - Full schema reference (DATABASE.md)
+- ✅ **User Manuals** - Step-by-step guides for all operations
+
 ## 📚 Dokumentasi Penggunaan dan Pengujian
 
 Dokumentasi berikut diurutkan berdasarkan alur implementasi dari setup awal hingga operasi transaksi:
@@ -345,24 +455,17 @@ Skenario pengujian untuk memvalidasi fitur-fitur HSM Simulator:
 3. **Untuk Development**: Referensi dokumentasi saat mengembangkan fitur baru
 4. **Untuk Troubleshooting**: Gunakan test scenario untuk debugging dan resolusi masalah
 
-## Teknologi yang Digunakan
-
-- **Backend**: Spring Boot 3.5.6 dengan Java 21
-- **Frontend**: Thymeleaf dengan Layout Dialect
-- **Styling**: Tailwind CSS 4.1
-- **Database**: PostgreSQL 17 dengan Flyway migrations
-- **Testing**: TestContainer, JUnit 5, dan Playwright untuk E2E testing
-- **Build**: Maven dengan frontend-maven-plugin
-
 ## Teknologi & Prasyarat
 
 ### Stack Teknologi
 - **Backend**: Spring Boot 3.5.6 dengan Java 21
-- **Frontend**: Thymeleaf dengan Layout Dialect
-- **Styling**: Tailwind CSS 4.1
+- **Security**: Spring Security dengan Form & Basic authentication
+- **Frontend**: Thymeleaf dengan Layout Dialect + Tailwind CSS 4.1
 - **Database**: PostgreSQL 17 dengan Flyway migrations
-- **Testing**: TestContainer, JUnit 5, dan Playwright untuk E2E testing
-- **Build**: Maven dengan frontend-maven-plugin
+- **ORM**: Spring Data JPA dengan Hibernate 6.6.29
+- **Cryptography**: Java Cryptography Architecture (JCA) - AES, DES, SHA-256, HMAC
+- **Testing**: TestContainer (PostgreSQL), JUnit 5, Playwright untuk E2E testing
+- **Build**: Maven dengan frontend-maven-plugin untuk npm integration
 
 ### Prasyarat Sistem
 - Java 21+
