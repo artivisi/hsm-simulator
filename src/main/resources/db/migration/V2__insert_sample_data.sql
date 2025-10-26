@@ -1,7 +1,7 @@
 -- ============================================================================
--- HSM Simulator - Sample Data for Four-Party Card Processing Model
+-- HSM Simulator - Sample Data
 -- Version: 2.0
--- Purpose: Insert sample data for banks, terminals, custodians, and keys
+-- Purpose: Insert sample data for banks, terminals, custodians, and users
 -- ============================================================================
 
 -- ============================================================================
@@ -109,18 +109,16 @@ INSERT INTO key_custodians (
     );
 
 -- ============================================================================
--- NOTE: Master Keys Removed
+-- Default Admin User
+-- Purpose: Create default admin user for initial system access
 -- ============================================================================
--- Sample keys have been removed because:
--- 1. In proper HSM architecture, LMK (Local Master Key) must be generated first
---    through a key ceremony
--- 2. All other keys (TMK, TPK, ZMK, ZPK, etc.) should be derived from LMK
--- 3. Without LMK, pre-populated keys serve no educational purpose
---
--- To use the simulator:
--- 1. Start a key ceremony at /hsm/initialize to generate LMK
--- 2. Generate other keys from /keys/generate after LMK exists
--- ============================================================================
+
+-- Insert default admin user
+-- Username: admin
+-- Password: admin123 (BCrypt hash for 'admin123')
+-- NOTE: Change this password in production!
+INSERT INTO users (username, email, password, full_name, role, active) VALUES
+('admin', 'admin@hsm-simulator.local', '$2a$10$XiLG2cUTyrhavQ0EDwicIOma78/x/bNX/V3PUMNJQuRumgwTLt4dy', 'System Administrator', 'ADMIN', TRUE);
 
 -- ============================================================================
 -- Comments
@@ -128,6 +126,7 @@ INSERT INTO key_custodians (
 COMMENT ON TABLE banks IS 'Four-party model: Issuer, Acquirer, Switch, and additional Issuer bank';
 COMMENT ON TABLE terminals IS 'Sample terminals including ATM, POS, and MPOS across different banks';
 COMMENT ON TABLE key_custodians IS 'Sample custodians created for testing key ceremony workflows';
+COMMENT ON TABLE users IS 'Default admin user for initial system access';
 
 -- ============================================================================
 -- End of Migration V2

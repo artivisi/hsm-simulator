@@ -37,7 +37,7 @@ public class GeneratedMac {
     private String macAlgorithm;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "mac_key_id", nullable = false)
+    @JoinColumn(name = "id_mac_key", nullable = false)
     private MasterKey macKey;
 
     @Enumerated(EnumType.STRING)

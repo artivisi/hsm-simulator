@@ -43,7 +43,7 @@ public class GeneratedPin {
     private String pinVerificationValue;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "encryption_key_id", nullable = false)
+    @JoinColumn(name = "id_encryption_key", nullable = false)
     private MasterKey encryptionKey;
 
     @Column(name = "clear_pin", length = 12)

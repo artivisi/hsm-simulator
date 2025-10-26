@@ -1,11 +1,56 @@
 -- ============================================================================
--- HSM Simulator - Key Ceremony Database Schema
+-- HSM Simulator - Complete Database Schema
 -- Version: 1.0
--- Purpose: Create tables for Key Ceremony functionality with 2-of-3 threshold
+-- Purpose: Create all tables for HSM Simulator functionality
 -- ============================================================================
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- ============================================================================
+-- Table: banks
+-- Purpose: Store bank/organization information for multi-party model
+-- ============================================================================
+CREATE TABLE banks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    bank_code VARCHAR(20) UNIQUE NOT NULL,
+    bank_name VARCHAR(255) NOT NULL,
+    bank_type VARCHAR(50) NOT NULL, -- ISSUER, ACQUIRER, SWITCH, PROCESSOR
+    country_code VARCHAR(3),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT chk_bank_type CHECK (bank_type IN ('ISSUER', 'ACQUIRER', 'SWITCH', 'PROCESSOR')),
+    CONSTRAINT chk_bank_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'))
+);
+
+CREATE INDEX idx_banks_type ON banks(bank_type);
+CREATE INDEX idx_banks_status ON banks(status);
+COMMENT ON TABLE banks IS 'Stores bank/organization information for four-party card processing model';
+
+-- ============================================================================
+-- Table: terminals
+-- Purpose: Store terminal information for terminal key management
+-- ============================================================================
+CREATE TABLE terminals (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    terminal_id VARCHAR(50) UNIQUE NOT NULL,
+    terminal_name VARCHAR(255) NOT NULL,
+    id_bank UUID NOT NULL,
+    terminal_type VARCHAR(50) NOT NULL, -- ATM, POS, MPOS, VIRTUAL, E_COMMERCE
+    location VARCHAR(255),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_bank) REFERENCES banks(id) ON DELETE RESTRICT,
+    CONSTRAINT chk_terminal_type CHECK (terminal_type IN ('ATM', 'POS', 'MPOS', 'VIRTUAL', 'E_COMMERCE')),
+    CONSTRAINT chk_terminal_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'MAINTENANCE'))
+);
+
+CREATE INDEX idx_terminals_bank ON terminals(id_bank);
+CREATE INDEX idx_terminals_status ON terminals(status);
+CREATE INDEX idx_terminals_type ON terminals(terminal_type);
+COMMENT ON TABLE terminals IS 'Stores terminal information (ATM, POS, etc.) for terminal key management';
 
 -- ============================================================================
 -- Table: key_custodians
@@ -27,6 +72,7 @@ CREATE TABLE key_custodians (
 
 CREATE INDEX idx_custodian_email ON key_custodians(email);
 CREATE INDEX idx_custodian_status ON key_custodians(status);
+COMMENT ON TABLE key_custodians IS 'Stores information about individuals who serve as key custodians';
 
 -- ============================================================================
 -- Table: key_ceremonies
@@ -60,6 +106,7 @@ CREATE TABLE key_ceremonies (
 CREATE INDEX idx_ceremony_status ON key_ceremonies(status);
 CREATE INDEX idx_ceremony_type ON key_ceremonies(ceremony_type);
 CREATE INDEX idx_ceremony_created_at ON key_ceremonies(started_at);
+COMMENT ON TABLE key_ceremonies IS 'Tracks the lifecycle and configuration of key ceremonies';
 
 -- ============================================================================
 -- Table: ceremony_custodians
@@ -90,6 +137,7 @@ CREATE INDEX idx_ceremony_custodians_ceremony ON ceremony_custodians(id_key_cere
 CREATE INDEX idx_ceremony_custodians_custodian ON ceremony_custodians(id_key_custodian);
 CREATE INDEX idx_ceremony_custodians_token ON ceremony_custodians(contribution_token);
 CREATE INDEX idx_ceremony_custodians_status ON ceremony_custodians(contribution_status);
+COMMENT ON TABLE ceremony_custodians IS 'Links custodians to specific ceremonies with their contribution status';
 
 -- ============================================================================
 -- Table: passphrase_contributions
@@ -115,49 +163,7 @@ CREATE TABLE passphrase_contributions (
 
 CREATE INDEX idx_contributions_ceremony_custodian ON passphrase_contributions(id_ceremony_custodian);
 CREATE INDEX idx_contributions_timestamp ON passphrase_contributions(contributed_at);
-
--- ============================================================================
--- Table: banks
--- Purpose: Store bank/organization information for multi-party model
--- ============================================================================
-CREATE TABLE banks (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    bank_code VARCHAR(20) UNIQUE NOT NULL,
-    bank_name VARCHAR(255) NOT NULL,
-    bank_type VARCHAR(50) NOT NULL, -- ISSUER, ACQUIRER, SWITCH, PROCESSOR
-    country_code VARCHAR(3),
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT chk_bank_type CHECK (bank_type IN ('ISSUER', 'ACQUIRER', 'SWITCH', 'PROCESSOR')),
-    CONSTRAINT chk_bank_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'))
-);
-
-CREATE INDEX idx_banks_type ON banks(bank_type);
-CREATE INDEX idx_banks_status ON banks(status);
-
--- ============================================================================
--- Table: terminals
--- Purpose: Store terminal information for terminal key management
--- ============================================================================
-CREATE TABLE terminals (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    terminal_id VARCHAR(50) UNIQUE NOT NULL,
-    terminal_name VARCHAR(255) NOT NULL,
-    id_bank UUID NOT NULL,
-    terminal_type VARCHAR(50) NOT NULL, -- ATM, POS, MPOS, VIRTUAL
-    location VARCHAR(255),
-    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (id_bank) REFERENCES banks(id) ON DELETE RESTRICT,
-    CONSTRAINT chk_terminal_type CHECK (terminal_type IN ('ATM', 'POS', 'MPOS', 'VIRTUAL', 'E_COMMERCE')),
-    CONSTRAINT chk_terminal_status CHECK (status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED', 'MAINTENANCE'))
-);
-
-CREATE INDEX idx_terminals_bank ON terminals(id_bank);
-CREATE INDEX idx_terminals_status ON terminals(status);
-CREATE INDEX idx_terminals_type ON terminals(terminal_type);
+COMMENT ON TABLE passphrase_contributions IS 'Stores custodian passphrase contributions with security metadata';
 
 -- ============================================================================
 -- Table: master_keys
@@ -208,6 +214,7 @@ CREATE INDEX idx_master_keys_status ON master_keys(status);
 CREATE INDEX idx_master_keys_fingerprint ON master_keys(key_fingerprint);
 CREATE INDEX idx_master_keys_parent ON master_keys(parent_key_id);
 CREATE INDEX idx_master_keys_rotated_from ON master_keys(rotated_from_key_id);
+COMMENT ON TABLE master_keys IS 'Stores all cryptographic keys: HSM master keys, TMK, TPK, TSK, ZMK, ZPK, ZSK with hierarchy support';
 
 -- ============================================================================
 -- Table: key_shares
@@ -239,6 +246,7 @@ CREATE TABLE key_shares (
 CREATE INDEX idx_key_shares_master_key ON key_shares(id_master_key);
 CREATE INDEX idx_key_shares_custodian ON key_shares(id_ceremony_custodian);
 CREATE INDEX idx_key_shares_used ON key_shares(used_in_restoration);
+COMMENT ON TABLE key_shares IS 'Stores Shamir Secret Sharing key shares for master key recovery';
 
 -- ============================================================================
 -- Table: ceremony_audit_logs
@@ -280,6 +288,7 @@ CREATE INDEX idx_audit_actor ON ceremony_audit_logs(actor_id);
 CREATE INDEX idx_audit_event_status ON ceremony_audit_logs(event_status);
 CREATE INDEX idx_audit_event_severity ON ceremony_audit_logs(event_severity);
 CREATE INDEX idx_audit_metadata ON ceremony_audit_logs USING GIN (event_metadata);
+COMMENT ON TABLE ceremony_audit_logs IS 'Comprehensive audit trail for all ceremony-related activities';
 
 -- ============================================================================
 -- Table: ceremony_statistics
@@ -303,6 +312,7 @@ CREATE TABLE ceremony_statistics (
 );
 
 CREATE UNIQUE INDEX idx_stats_ceremony ON ceremony_statistics(id_key_ceremony);
+COMMENT ON TABLE ceremony_statistics IS 'Aggregated statistics for ceremony monitoring and reporting';
 
 -- ============================================================================
 -- Table: contribution_reminders
@@ -323,6 +333,7 @@ CREATE TABLE contribution_reminders (
 
 CREATE INDEX idx_reminders_ceremony_custodian ON contribution_reminders(id_ceremony_custodian);
 CREATE INDEX idx_reminders_sent_at ON contribution_reminders(sent_at);
+COMMENT ON TABLE contribution_reminders IS 'Tracks reminder communications sent to custodians';
 
 -- ============================================================================
 -- Table: key_restoration_requests
@@ -352,6 +363,7 @@ CREATE TABLE key_restoration_requests (
 CREATE INDEX idx_restoration_original_ceremony ON key_restoration_requests(id_key_ceremony_original);
 CREATE INDEX idx_restoration_master_key ON key_restoration_requests(id_master_key);
 CREATE INDEX idx_restoration_status ON key_restoration_requests(status);
+COMMENT ON TABLE key_restoration_requests IS 'Tracks requests to restore master keys using key shares';
 
 -- ============================================================================
 -- Table: restoration_share_submissions
@@ -376,6 +388,7 @@ CREATE TABLE restoration_share_submissions (
 CREATE INDEX idx_restoration_submissions ON restoration_share_submissions(id_key_restoration_request);
 CREATE INDEX idx_restoration_submissions_share ON restoration_share_submissions(id_key_share);
 CREATE INDEX idx_restoration_submissions_custodian ON restoration_share_submissions(id_ceremony_custodian);
+COMMENT ON TABLE restoration_share_submissions IS 'Tracks share submissions during restoration ceremonies';
 
 -- ============================================================================
 -- Table: zone_key_exchanges
@@ -413,6 +426,7 @@ CREATE INDEX idx_zone_exchanges_destination ON zone_key_exchanges(id_destination
 CREATE INDEX idx_zone_exchanges_zmk ON zone_key_exchanges(id_zmk);
 CREATE INDEX idx_zone_exchanges_status ON zone_key_exchanges(exchange_status);
 CREATE INDEX idx_zone_exchanges_initiated_at ON zone_key_exchanges(initiated_at);
+COMMENT ON TABLE zone_key_exchanges IS 'Tracks inter-bank zone key exchanges (ZMK, ZPK, ZSK) for four-party model';
 
 -- ============================================================================
 -- Table: key_rotation_history
@@ -445,25 +459,94 @@ CREATE INDEX idx_rotation_history_old_key ON key_rotation_history(id_old_key);
 CREATE INDEX idx_rotation_history_new_key ON key_rotation_history(id_new_key);
 CREATE INDEX idx_rotation_history_status ON key_rotation_history(rotation_status);
 CREATE INDEX idx_rotation_history_started_at ON key_rotation_history(rotation_started_at);
+COMMENT ON TABLE key_rotation_history IS 'Complete audit trail of key rotation activities for compliance';
 
 -- ============================================================================
--- Comments for documentation
+-- Table: users
+-- Purpose: Store system users with authentication credentials
 -- ============================================================================
-COMMENT ON TABLE banks IS 'Stores bank/organization information for four-party card processing model';
-COMMENT ON TABLE terminals IS 'Stores terminal information (ATM, POS, etc.) for terminal key management';
-COMMENT ON TABLE key_custodians IS 'Stores information about individuals who serve as key custodians';
-COMMENT ON TABLE key_ceremonies IS 'Tracks the lifecycle and configuration of key ceremonies';
-COMMENT ON TABLE ceremony_custodians IS 'Links custodians to specific ceremonies with their contribution status';
-COMMENT ON TABLE passphrase_contributions IS 'Stores custodian passphrase contributions with security metadata';
-COMMENT ON TABLE master_keys IS 'Stores all cryptographic keys: HSM master keys, TMK, TPK, TSK, ZMK, ZPK, ZSK with hierarchy support';
-COMMENT ON TABLE key_shares IS 'Stores Shamir Secret Sharing key shares for master key recovery';
-COMMENT ON TABLE ceremony_audit_logs IS 'Comprehensive audit trail for all ceremony-related activities';
-COMMENT ON TABLE ceremony_statistics IS 'Aggregated statistics for ceremony monitoring and reporting';
-COMMENT ON TABLE contribution_reminders IS 'Tracks reminder communications sent to custodians';
-COMMENT ON TABLE key_restoration_requests IS 'Tracks requests to restore master keys using key shares';
-COMMENT ON TABLE restoration_share_submissions IS 'Tracks share submissions during restoration ceremonies';
-COMMENT ON TABLE zone_key_exchanges IS 'Tracks inter-bank zone key exchanges (ZMK, ZPK, ZSK) for four-party model';
-COMMENT ON TABLE key_rotation_history IS 'Complete audit trail of key rotation activities for compliance';
+CREATE TABLE users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL, -- BCrypt hashed
+    full_name VARCHAR(100) NOT NULL,
+    role VARCHAR(20) NOT NULL DEFAULT 'ADMIN', -- ADMIN, OPERATOR, AUDITOR
+    active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP,
+    failed_login_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until TIMESTAMP,
+    CONSTRAINT chk_user_role CHECK (role IN ('ADMIN', 'OPERATOR', 'AUDITOR'))
+);
+
+CREATE INDEX idx_users_username ON users(username);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_active ON users(active);
+COMMENT ON TABLE users IS 'System users for authentication and authorization';
+
+-- ============================================================================
+-- Table: generated_pins
+-- Purpose: Store generated and encrypted PINs for card accounts
+-- ============================================================================
+CREATE TABLE generated_pins (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    account_number VARCHAR(19) NOT NULL UNIQUE,
+    pin_length INTEGER NOT NULL CHECK (pin_length BETWEEN 4 AND 12),
+    pin_format VARCHAR(20) NOT NULL,
+    encrypted_pin_block TEXT NOT NULL,
+    pin_verification_value VARCHAR(10),
+    id_encryption_key UUID NOT NULL,
+    clear_pin VARCHAR(12),
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE',
+    generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_verified_at TIMESTAMP,
+    verification_attempts INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (id_encryption_key) REFERENCES master_keys(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_generated_pins_account ON generated_pins(account_number);
+CREATE INDEX idx_generated_pins_status ON generated_pins(status);
+CREATE INDEX idx_generated_pins_encryption_key ON generated_pins(id_encryption_key);
+CREATE INDEX idx_generated_pins_generated_at ON generated_pins(generated_at DESC);
+COMMENT ON TABLE generated_pins IS 'Stores generated and encrypted PINs for card accounts';
+COMMENT ON COLUMN generated_pins.pin_format IS 'PIN block format: ISO-0, ISO-1, ISO-3, ISO-4';
+COMMENT ON COLUMN generated_pins.pin_verification_value IS 'PIN Verification Value (PVV) for offline PIN verification';
+COMMENT ON COLUMN generated_pins.clear_pin IS 'Clear PIN for simulation/testing - NEVER store in production';
+
+-- ============================================================================
+-- Table: generated_macs
+-- Purpose: Store generated MACs for transaction integrity verification
+-- ============================================================================
+CREATE TABLE generated_macs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    message TEXT NOT NULL,
+    message_length INTEGER NOT NULL,
+    mac_value VARCHAR(64) NOT NULL,
+    mac_algorithm VARCHAR(50) NOT NULL CHECK (mac_algorithm IN ('ISO9797-ALG3', 'HMAC-SHA256', 'CBC-MAC')),
+    id_mac_key UUID NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'EXPIRED', 'REVOKED')),
+    verification_attempts INTEGER DEFAULT 0,
+    last_verified_at TIMESTAMP,
+    generated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (id_mac_key) REFERENCES master_keys(id) ON DELETE RESTRICT
+);
+
+CREATE INDEX idx_generated_macs_mac_key_id ON generated_macs(id_mac_key);
+CREATE INDEX idx_generated_macs_status ON generated_macs(status);
+CREATE INDEX idx_generated_macs_generated_at ON generated_macs(generated_at);
+CREATE INDEX idx_generated_macs_message_key ON generated_macs(message, id_mac_key);
+COMMENT ON TABLE generated_macs IS 'Stores generated MACs (Message Authentication Codes) for transaction integrity verification';
+COMMENT ON COLUMN generated_macs.message IS 'Original message that was authenticated';
+COMMENT ON COLUMN generated_macs.message_length IS 'Length of the message in bytes';
+COMMENT ON COLUMN generated_macs.mac_value IS 'Generated MAC value (hexadecimal)';
+COMMENT ON COLUMN generated_macs.mac_algorithm IS 'MAC algorithm used (ISO9797-ALG3, HMAC-SHA256, CBC-MAC)';
+COMMENT ON COLUMN generated_macs.id_mac_key IS 'Reference to the MAC key (TSK or ZSK) used';
+COMMENT ON COLUMN generated_macs.status IS 'Current status: ACTIVE, EXPIRED, or REVOKED';
+COMMENT ON COLUMN generated_macs.verification_attempts IS 'Number of times this MAC has been verified';
+COMMENT ON COLUMN generated_macs.last_verified_at IS 'Timestamp of last verification attempt';
+COMMENT ON COLUMN generated_macs.generated_at IS 'Timestamp when MAC was generated';
 
 -- ============================================================================
 -- End of Migration V1
