@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Generate PIN</title>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Generate PIN</h1>
+            <p class="text-slate-600">Generate encrypted PIN for card accounts using LMK (storage) or TPK/ZPK (transmission)</p>
+        </div>
+
+        <!-- Generation Form -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-lg font-semibold text-slate-900">PIN Generation Parameters</h2>
+            </div>
+
+            <form id="pinGenerationForm" onsubmit="generatePIN(event)" class="p-8">
+                <div class="space-y-6">
+                    <!-- Encryption Key Selection -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            Encryption Key <span class="text-red-600">*</span>
+                        </label>
+                        <select name="keyId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                            <option value="">Select encryption key...</option>
+                            <option th:each="key : ${pinKeys}"
+                                    th:value="${key.id}"
+                                    th:text="${key.keyType + ' - ' + key.masterKeyId}"></option>
+                        </select>
+                        <div class="mt-2 text-sm text-slate-600 space-y-1">
+                            <p><strong>LMK (Local Master Key):</strong> For PIN storage in HSM database</p>
+                            <p><strong>TPK (Terminal PIN Key):</strong> For PIN transmission to/from terminals</p>
+                            <p><strong>ZPK (Zone PIN Key):</strong> For PIN transmission between institutions</p>
+                        </div>
+                    </div>
+
+                    <!-- Account Number -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            Account Number (PAN) <span class="text-red-600">*</span>
+                        </label>
+                        <input type="text"
+                               name="accountNumber"
+                               required
+                               pattern="[0-9]{12,19}"
+                               maxlength="19"
+                               class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900 font-mono"
+                               placeholder="4111111111111111">
+                        <p class="mt-1 text-sm text-slate-500">Enter 12-19 digit Primary Account Number</p>
+                    </div>
+
+                    <!-- PIN Length -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            PIN Length <span class="text-red-600">*</span>
+                        </label>
+                        <select name="pinLength" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                            <option value="4" selected>4 digits</option>
+                            <option value="5">5 digits</option>
+                            <option value="6">6 digits</option>
+                            <option value="8">8 digits</option>
+                        </select>
+                    </div>
+
+                    <!-- PIN Block Format -->
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-2">
+                            PIN Block Format <span class="text-red-600">*</span>
+                        </label>
+                        <select name="pinFormat" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                            <option value="ISO-0" selected>ISO Format 0 (ISO 9564-1:2002)</option>
+                            <option value="ISO-1">ISO Format 1 (ISO 9564-1:2002)</option>
+                            <option value="ISO-3">ISO Format 3 (ISO 9564-1:2002)</option>
+                        </select>
+                        <div class="mt-2 text-sm text-slate-600 space-y-1">
+                            <p><strong>ISO-0:</strong> Most common format, XOR with PAN</p>
+                            <p><strong>ISO-1:</strong> Random padding, no PAN required</p>
+                            <p><strong>ISO-3:</strong> Similar to ISO-0 with different padding</p>
+                        </div>
+                    </div>
+
+                    <!-- Generate Button -->
+                    <button type="submit"
+                            class="w-full px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
+                        Generate PIN
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Result Display -->
+        <div id="resultContainer" class="hidden mt-8 bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-green-50">
+                <h2 class="text-lg font-semibold text-green-900">PIN Generated Successfully</h2>
+            </div>
+            <div class="p-8 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Account Number:</label>
+                        <code id="resultAccountNumber" class="block px-4 py-2 bg-slate-100 rounded font-mono text-sm"></code>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Clear PIN (for user):</label>
+                        <code id="resultClearPin" class="block px-4 py-2 bg-green-100 text-green-900 rounded font-mono text-lg font-bold"></code>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">PIN Verification Value (PVV):</label>
+                    <code id="resultPVV" class="block px-4 py-2 bg-slate-100 rounded font-mono text-sm"></code>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Encrypted PIN Block:</label>
+                    <code id="resultEncryptedBlock" class="block px-4 py-2 bg-slate-100 rounded font-mono text-xs break-all"></code>
+                </div>
+                <div class="flex gap-3 pt-4">
+                    <a href="/pins" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                        View All PINs
+                    </a>
+                    <button onclick="generateAnother()" class="px-6 py-2 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors">
+                        Generate Another
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        async function generatePIN(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            // Get CSRF token
+            const token = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            const header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+            try {
+                const response = await fetch('/pins/api/generate', {
+                    method: 'POST',
+                    headers: {
+                        [header]: token,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    // Display results
+                    document.getElementById('resultAccountNumber').textContent = result.accountNumber;
+                    document.getElementById('resultClearPin').textContent = result.clearPin;
+                    document.getElementById('resultPVV').textContent = result.pvv;
+                    document.getElementById('resultEncryptedBlock').textContent = result.encryptedPinBlock;
+
+                    document.getElementById('resultContainer').classList.remove('hidden');
+                    form.reset();
+
+                    // Scroll to results
+                    document.getElementById('resultContainer').scrollIntoView({ behavior: 'smooth' });
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An unexpected error occurred');
+            }
+        }
+
+        function generateAnother() {
+            document.getElementById('resultContainer').classList.add('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    </script>
+</div>
+</body>
+</html>

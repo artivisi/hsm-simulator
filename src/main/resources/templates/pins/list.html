@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>PIN Management</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">PIN Management</h1>
+                <p class="text-slate-600">Generate and manage encrypted PINs for card accounts</p>
+            </div>
+            <a href="/pins/generate" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
+                + Generate New PIN
+            </a>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Total PINs</span>
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${totalPins}">0</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Active PINs</span>
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${activePins}">0</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Blocked PINs</span>
+                    <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${blockedPins}">0</p>
+            </div>
+        </div>
+
+        <!-- PINs Table -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-lg font-semibold text-slate-900">Generated PINs</h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Account Number</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">PIN Length</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Format</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Clear PIN</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">PVV</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Encrypted Block</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Generated</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-slate-200">
+                        <tr th:if="${pinsPage.empty}">
+                            <td colspan="9" class="px-6 py-8 text-center text-slate-500">
+                                No PINs generated yet. Click "Generate New PIN" to create one.
+                            </td>
+                        </tr>
+                        <tr th:each="pin : ${pinsPage.content}" class="hover:bg-slate-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-mono font-medium text-slate-900" th:text="${pin.accountNumber}"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900" th:text="${pin.pinLength}"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800" th:text="${pin.pinFormat}"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <code class="px-2 py-1 bg-slate-100 text-slate-900 rounded font-mono text-sm" th:text="${pin.clearPin}"></code>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <code class="px-2 py-1 bg-slate-100 text-slate-900 rounded font-mono text-sm" th:text="${pin.pinVerificationValue}"></code>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-xs font-mono text-slate-600 truncate max-w-xs" th:text="${pin.encryptedPinBlock}" th:title="${pin.encryptedPinBlock}"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span th:if="${pin.status.name() == 'ACTIVE'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Active
+                                </span>
+                                <span th:if="${pin.status.name() == 'BLOCKED'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Blocked
+                                </span>
+                                <span th:if="${pin.status.name() == 'EXPIRED'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">
+                                    Expired
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600" th:text="${#temporals.format(pin.generatedAt, 'yyyy-MM-dd HH:mm')}"></td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                <form th:action="@{/pins/{id}/delete(id=${pin.id})}"
+                                      method="post"
+                                      style="display: inline;">
+                                    <button type="submit"
+                                            onclick="return confirm('Are you sure you want to delete the PIN for account ' + this.form.closest('tr').querySelector('td:first-child div').textContent + '? This action cannot be undone.');"
+                                            class="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded transition-colors">
+                                        Delete
+                                    </button>
+                                </form>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

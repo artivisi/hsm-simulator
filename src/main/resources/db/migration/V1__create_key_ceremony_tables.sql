@@ -170,7 +170,7 @@ CREATE TABLE master_keys (
     id_bank UUID,
     id_terminal UUID,
     parent_key_id UUID, -- Reference to parent key in hierarchy
-    key_type VARCHAR(50) NOT NULL DEFAULT 'HSM_MASTER_KEY',
+    key_type VARCHAR(50) NOT NULL DEFAULT 'LMK',
     key_usage VARCHAR(50), -- PIN_ENCRYPTION, DATA_ENCRYPTION, KEY_ENCRYPTION, MAC_GENERATION
     algorithm VARCHAR(50) NOT NULL,
     key_size INTEGER NOT NULL,
@@ -194,7 +194,7 @@ CREATE TABLE master_keys (
     FOREIGN KEY (id_terminal) REFERENCES terminals(id) ON DELETE RESTRICT,
     FOREIGN KEY (parent_key_id) REFERENCES master_keys(id) ON DELETE SET NULL,
     FOREIGN KEY (rotated_from_key_id) REFERENCES master_keys(id) ON DELETE SET NULL,
-    CONSTRAINT chk_master_key_type CHECK (key_type IN ('HSM_MASTER_KEY', 'TMK', 'TPK', 'TSK', 'ZMK', 'ZPK', 'ZSK', 'LMK', 'KEK')),
+    CONSTRAINT chk_master_key_type CHECK (key_type IN ('LMK', 'TMK', 'TPK', 'TSK', 'ZMK', 'ZPK', 'ZSK', 'KEK')),
     CONSTRAINT chk_master_key_usage CHECK (key_usage IN ('PIN_ENCRYPTION', 'DATA_ENCRYPTION', 'KEY_ENCRYPTION', 'MAC_GENERATION', 'SESSION', 'MASTER')),
     CONSTRAINT chk_master_key_status CHECK (status IN ('ACTIVE', 'ROTATED', 'REVOKED', 'EXPIRED')),
     CONSTRAINT chk_master_key_size CHECK (key_size IN (128, 192, 256))

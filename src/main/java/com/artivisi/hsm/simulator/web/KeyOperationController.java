@@ -1,6 +1,7 @@
 package com.artivisi.hsm.simulator.web;
 
 import com.artivisi.hsm.simulator.entity.Bank;
+import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.entity.Terminal;
 import com.artivisi.hsm.simulator.repository.BankRepository;
@@ -37,9 +38,9 @@ public class KeyOperationController {
         model.addAttribute("banks", bankRepository.findAll());
         model.addAttribute("terminals", terminalRepository.findAll());
         model.addAttribute("tmks", masterKeyRepository.findByStatus(MasterKey.KeyStatus.ACTIVE)
-                .stream().filter(k -> "TMK".equals(k.getKeyType())).toList());
+                .stream().filter(k -> k.getKeyType() == KeyType.TMK).toList());
         model.addAttribute("zmks", masterKeyRepository.findByStatus(MasterKey.KeyStatus.ACTIVE)
-                .stream().filter(k -> "ZMK".equals(k.getKeyType())).toList());
+                .stream().filter(k -> k.getKeyType() == KeyType.ZMK).toList());
 
         return "keys/generate";
     }

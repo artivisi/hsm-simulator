@@ -1,5 +1,6 @@
 package com.artivisi.hsm.simulator.service;
 
+import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
 import lombok.RequiredArgsConstructor;
@@ -275,7 +276,7 @@ public class OfflineRecoveryService {
         MasterKey masterKey = MasterKey.builder()
                 .masterKeyId(masterKeyId)
                 .keyCeremony(null) // No ceremony for recovered keys
-                .keyType("HSM_MASTER_KEY")
+                .keyType(KeyType.LMK)
                 .algorithm("AES")
                 .keySize(256)
                 .keyDataEncrypted(recoveryResult.getReconstructedKey())

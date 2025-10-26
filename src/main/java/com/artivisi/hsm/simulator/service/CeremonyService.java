@@ -249,7 +249,7 @@ public class CeremonyService {
             MasterKey masterKey = MasterKey.builder()
                     .masterKeyId(masterKeyId)
                     .keyCeremony(ceremony)
-                    .keyType("HSM_MASTER_KEY")
+                    .keyType(KeyType.LMK)
                     .algorithm(ceremony.getAlgorithm())
                     .keySize(ceremony.getKeySize())
                     .keyDataEncrypted(keyResult.getKeyData()) // In production, encrypt this

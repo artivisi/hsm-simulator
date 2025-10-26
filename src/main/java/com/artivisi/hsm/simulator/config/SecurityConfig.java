@@ -23,6 +23,7 @@ public class SecurityConfig {
                 // Public endpoints - no authentication required
                 .requestMatchers("/login", "/css/**", "/js/**", "/images/**").permitAll()
                 .requestMatchers("/hsm/contribute/**").permitAll() // Custodian contribution via token
+                .requestMatchers("/api/contributions/**").permitAll() // API endpoints for contribution
                 // All other endpoints require authentication
                 .anyRequest().authenticated()
             )

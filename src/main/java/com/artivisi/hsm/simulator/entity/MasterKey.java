@@ -44,9 +44,10 @@ public class MasterKey {
     @Column(name = "rotated_from_key_id")
     private UUID rotatedFromKeyId;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "key_type", nullable = false, length = 50)
     @Builder.Default
-    private String keyType = "HSM_MASTER_KEY";
+    private KeyType keyType = KeyType.LMK;
 
     @Column(nullable = false, length = 50)
     private String algorithm;

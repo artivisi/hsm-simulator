@@ -1,6 +1,7 @@
 package com.artivisi.hsm.simulator.service;
 
 import com.artivisi.hsm.simulator.entity.Bank;
+import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.entity.Terminal;
 import com.artivisi.hsm.simulator.repository.BankRepository;
@@ -47,7 +48,7 @@ public class KeyOperationService {
 
         MasterKey tmk = MasterKey.builder()
                 .masterKeyId(masterKeyId)
-                .keyType("TMK")
+                .keyType(KeyType.TMK)
                 .algorithm("AES")
                 .keySize(keySize)
                 .keyDataEncrypted(keyData)
@@ -77,7 +78,7 @@ public class KeyOperationService {
         Terminal terminal = terminalRepository.findById(terminalId)
                 .orElseThrow(() -> new IllegalArgumentException("Terminal not found: " + terminalId));
 
-        if (!"TMK".equals(tmk.getKeyType())) {
+        if (tmk.getKeyType() != KeyType.TMK) {
             throw new IllegalArgumentException("Parent key must be TMK, got: " + tmk.getKeyType());
         }
 
@@ -87,7 +88,7 @@ public class KeyOperationService {
         MasterKey tpk = MasterKey.builder()
                 .masterKeyId(masterKeyId)
                 .parentKeyId(tmk.getId())
-                .keyType("TPK")
+                .keyType(KeyType.TPK)
                 .algorithm("AES")
                 .keySize(tmk.getKeySize())
                 .keyDataEncrypted(keyData)
@@ -117,7 +118,7 @@ public class KeyOperationService {
         Terminal terminal = terminalRepository.findById(terminalId)
                 .orElseThrow(() -> new IllegalArgumentException("Terminal not found: " + terminalId));
 
-        if (!"TMK".equals(tmk.getKeyType())) {
+        if (tmk.getKeyType() != KeyType.TMK) {
             throw new IllegalArgumentException("Parent key must be TMK, got: " + tmk.getKeyType());
         }
 
@@ -127,7 +128,7 @@ public class KeyOperationService {
         MasterKey tsk = MasterKey.builder()
                 .masterKeyId(masterKeyId)
                 .parentKeyId(tmk.getId())
-                .keyType("TSK")
+                .keyType(KeyType.TSK)
                 .algorithm("AES")
                 .keySize(tmk.getKeySize())
                 .keyDataEncrypted(keyData)
@@ -159,7 +160,7 @@ public class KeyOperationService {
 
         MasterKey zmk = MasterKey.builder()
                 .masterKeyId(masterKeyId)
-                .keyType("ZMK")
+                .keyType(KeyType.ZMK)
                 .algorithm("AES")
                 .keySize(keySize)
                 .keyDataEncrypted(keyData)
@@ -186,7 +187,7 @@ public class KeyOperationService {
         MasterKey zmk = masterKeyRepository.findById(zmkId)
                 .orElseThrow(() -> new IllegalArgumentException("ZMK not found: " + zmkId));
 
-        if (!"ZMK".equals(zmk.getKeyType())) {
+        if (zmk.getKeyType() != KeyType.ZMK) {
             throw new IllegalArgumentException("Parent key must be ZMK, got: " + zmk.getKeyType());
         }
 
@@ -196,7 +197,7 @@ public class KeyOperationService {
         MasterKey zpk = MasterKey.builder()
                 .masterKeyId(masterKeyId)
                 .parentKeyId(zmk.getId())
-                .keyType("ZPK")
+                .keyType(KeyType.ZPK)
                 .algorithm("AES")
                 .keySize(zmk.getKeySize())
                 .keyDataEncrypted(keyData)
@@ -223,7 +224,7 @@ public class KeyOperationService {
         MasterKey zmk = masterKeyRepository.findById(zmkId)
                 .orElseThrow(() -> new IllegalArgumentException("ZMK not found: " + zmkId));
 
-        if (!"ZMK".equals(zmk.getKeyType())) {
+        if (zmk.getKeyType() != KeyType.ZMK) {
             throw new IllegalArgumentException("Parent key must be ZMK, got: " + zmk.getKeyType());
         }
 
@@ -233,7 +234,7 @@ public class KeyOperationService {
         MasterKey zsk = MasterKey.builder()
                 .masterKeyId(masterKeyId)
                 .parentKeyId(zmk.getId())
-                .keyType("ZSK")
+                .keyType(KeyType.ZSK)
                 .algorithm("AES")
                 .keySize(zmk.getKeySize())
                 .keyDataEncrypted(keyData)
