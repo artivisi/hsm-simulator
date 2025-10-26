@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en" xmlns:th="http://www.thymeleaf.org"
-      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout">
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -11,21 +12,54 @@
     </th:block>
 </head>
 <body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen text-white">
-    <div class="container mx-auto px-4 py-12">
-        <!-- Logo Header (optional, can be overridden) -->
-        <div layout:fragment="header" class="text-center mb-8">
-            <a th:href="@{/}">
-                <img th:src="@{/img/artivisi-logo-white.svg}" alt="ArtiVisi Intermedia"
-                     class="h-12 w-auto mx-auto opacity-90 hover:opacity-100 transition-opacity">
-            </a>
-        </div>
+    <!-- Navigation Bar -->
+    <nav class="border-b border-slate-700 bg-slate-900/50 backdrop-blur-sm">
+        <div class="container mx-auto px-4">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo and Title -->
+                <div class="flex items-center space-x-4">
+                    <a th:href="@{/}" class="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+                        <img th:src="@{/img/artivisi-logo-white.svg}" alt="ArtiVisi" class="h-8 w-auto">
+                        <span class="text-xl font-bold text-white">HSM Simulator</span>
+                    </a>
+                </div>
 
+                <!-- Navigation Menu -->
+                <div class="hidden md:flex items-center space-x-6">
+                    <a th:href="@{/}" class="text-slate-300 hover:text-white transition-colors">
+                        Home
+                    </a>
+                    <a th:href="@{/hsm/initialize}" class="text-slate-300 hover:text-white transition-colors">
+                        Initialize
+                    </a>
+                    <a th:href="@{/keys}" class="text-slate-300 hover:text-white transition-colors">
+                        Keys
+                    </a>
+                    <a th:href="@{/hsm/recovery}" class="text-slate-300 hover:text-white transition-colors">
+                        Recovery
+                    </a>
+                </div>
+
+                <!-- User Menu & Logout -->
+                <div class="flex items-center space-x-4">
+                    <span class="text-slate-400 text-sm hidden md:inline" sec:authentication="name">User</span>
+                    <form th:action="@{/logout}" method="post" class="inline">
+                        <button type="submit" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition-colors">
+                            Logout
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto px-4 py-12">
         <!-- Main Content -->
         <div layout:fragment="content">
             <!-- Page content goes here -->
         </div>
 
-        <!-- Footer (optional) -->
+        <!-- Footer -->
         <div layout:fragment="footer" class="text-center text-slate-500 text-sm border-t border-slate-700 pt-8 mt-12">
             <p>&copy; 2025 ArtiVisi Intermedia. All rights reserved.</p>
         </div>

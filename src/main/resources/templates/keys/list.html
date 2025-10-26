@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Master Keys</title>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Master Keys</h1>
+            <p class="text-slate-600">View and manage all cryptographic keys in the HSM</p>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Total Keys</span>
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${totalKeys}">0</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Active Keys</span>
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${activeKeys}">0</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Recovered Keys</span>
+                    <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${recoveredKeys}">0</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Revoked Keys</span>
+                    <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${revokedKeys}">0</p>
+            </div>
+        </div>
+
+        <!-- Keys Table -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-lg font-semibold text-slate-900">All Master Keys</h2>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-slate-200">
+                    <thead class="bg-slate-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Key ID</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Type</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Algorithm</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Generation</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Fingerprint</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Created</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-slate-200">
+                        <tr th:if="${masterKeysPage.empty}">
+                            <td colspan="7" class="px-6 py-8 text-center text-slate-500">
+                                No master keys found. Create a key ceremony to generate new keys.
+                            </td>
+                        </tr>
+                        <tr th:each="key : ${masterKeysPage.content}" class="hover:bg-slate-50">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-mono font-medium text-slate-900" th:text="${key.masterKeyId}"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800" th:text="${key.keyType}"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">
+                                <span th:text="${key.algorithm}"></span>-<span th:text="${key.keySize}"></span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600" th:text="${key.generationMethod}"></td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span th:if="${key.status.name() == 'ACTIVE'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                    Active
+                                </span>
+                                <span th:if="${key.status.name() == 'ROTATED'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                                    Rotated
+                                </span>
+                                <span th:if="${key.status.name() == 'REVOKED'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
+                                    Revoked
+                                </span>
+                                <span th:if="${key.status.name() == 'EXPIRED'}" class="px-2 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-slate-100 text-slate-800">
+                                    Expired
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-xs font-mono text-slate-600 truncate max-w-xs" th:text="${key.keyFingerprint}" th:title="${key.keyFingerprint}"></div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600" th:text="${#temporals.format(key.generatedAt, 'yyyy-MM-dd HH:mm')}"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div th:if="${masterKeysPage.totalPages > 1}" class="px-6 py-4 border-t border-slate-200 bg-slate-50">
+                <div class="flex items-center justify-between">
+                    <div class="text-sm text-slate-600">
+                        Showing <span th:text="${masterKeysPage.number * masterKeysPage.size + 1}">1</span>
+                        to <span th:text="${T(java.lang.Math).min((masterKeysPage.number + 1) * masterKeysPage.size, masterKeysPage.totalElements)}">10</span>
+                        of <span th:text="${masterKeysPage.totalElements}">0</span> keys
+                    </div>
+
+                    <nav class="flex gap-2">
+                        <!-- First Page -->
+                        <a th:href="@{/keys(page=0, size=${pageSize}, sortBy=${sortBy}, direction=${direction})}"
+                           th:classappend="${masterKeysPage.first} ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-200'"
+                           class="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg transition-colors">
+                            First
+                        </a>
+
+                        <!-- Previous Page -->
+                        <a th:href="@{/keys(page=${masterKeysPage.number - 1}, size=${pageSize}, sortBy=${sortBy}, direction=${direction})}"
+                           th:classappend="${masterKeysPage.first} ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-200'"
+                           class="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg transition-colors">
+                            Previous
+                        </a>
+
+                        <!-- Page Numbers -->
+                        <span class="px-3 py-2 text-sm font-medium text-slate-700">
+                            Page <span th:text="${masterKeysPage.number + 1}">1</span> of <span th:text="${masterKeysPage.totalPages}">1</span>
+                        </span>
+
+                        <!-- Next Page -->
+                        <a th:href="@{/keys(page=${masterKeysPage.number + 1}, size=${pageSize}, sortBy=${sortBy}, direction=${direction})}"
+                           th:classappend="${masterKeysPage.last} ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-200'"
+                           class="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg transition-colors">
+                            Next
+                        </a>
+
+                        <!-- Last Page -->
+                        <a th:href="@{/keys(page=${masterKeysPage.totalPages - 1}, size=${pageSize}, sortBy=${sortBy}, direction=${direction})}"
+                           th:classappend="${masterKeysPage.last} ? 'opacity-50 cursor-not-allowed' : 'hover:bg-slate-200'"
+                           class="px-3 py-2 text-sm font-medium text-slate-700 bg-white border border-slate-300 rounded-lg transition-colors">
+                            Last
+                        </a>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - HSM Simulator</title>
+    <link rel="stylesheet" th:href="@{/css/output.css}">
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 min-h-screen flex items-center justify-center p-4">
+    <div class="max-w-md w-full">
+        <!-- Logo/Header -->
+        <div class="text-center mb-8">
+            <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-600 rounded-xl mb-4">
+                <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                </svg>
+            </div>
+            <h1 class="text-3xl font-bold text-white mb-2">HSM Simulator</h1>
+            <p class="text-slate-400">Sign in to access the key management system</p>
+        </div>
+
+        <!-- Login Card -->
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl p-8 shadow-xl">
+            <!-- Error Message -->
+            <div th:if="${error}" class="mb-6 bg-red-500/10 border border-red-500/50 rounded-lg p-4">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-red-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"/>
+                    </svg>
+                    <p class="text-red-400 text-sm" th:text="${error}"></p>
+                </div>
+            </div>
+
+            <!-- Success Message -->
+            <div th:if="${message}" class="mb-6 bg-green-500/10 border border-green-500/50 rounded-lg p-4">
+                <div class="flex items-start">
+                    <svg class="w-5 h-5 text-green-400 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                    </svg>
+                    <p class="text-green-400 text-sm" th:text="${message}"></p>
+                </div>
+            </div>
+
+            <!-- Login Form -->
+            <form th:action="@{/login}" method="post">
+                <div class="mb-6">
+                    <label for="username" class="block text-sm font-medium text-slate-300 mb-2">
+                        Username
+                    </label>
+                    <input type="text" id="username" name="username" required autofocus
+                           class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                           placeholder="Enter your username">
+                </div>
+
+                <div class="mb-6">
+                    <label for="password" class="block text-sm font-medium text-slate-300 mb-2">
+                        Password
+                    </label>
+                    <div class="relative">
+                        <input type="password" id="password" name="password" required
+                               class="w-full bg-slate-900/50 border border-slate-600 rounded-lg px-4 py-3 pr-12 text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                               placeholder="Enter your password">
+                        <button type="button" onclick="togglePassword()"
+                                class="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white">
+                            <svg id="eyeIcon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between mb-6">
+                    <label class="flex items-center">
+                        <input type="checkbox" name="remember-me" class="w-4 h-4 rounded border-slate-600 bg-slate-900/50 text-blue-600 focus:ring-blue-500 focus:ring-offset-0">
+                        <span class="ml-2 text-sm text-slate-300">Remember me</span>
+                    </label>
+                </div>
+
+                <button type="submit"
+                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-6 rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-800">
+                    Sign In
+                </button>
+            </form>
+        </div>
+
+        <!-- Footer -->
+        <div class="text-center mt-8">
+            <p class="text-slate-500 text-sm">
+                HSM Simulator v1.0 &copy; ArtiVisi Intermedia
+            </p>
+        </div>
+    </div>
+
+    <script>
+        function togglePassword() {
+            const field = document.getElementById('password');
+            field.type = field.type === 'password' ? 'text' : 'password';
+        }
+    </script>
+</body>
+</html>

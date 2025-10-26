@@ -29,4 +29,9 @@ public interface MasterKeyRepository extends JpaRepository<MasterKey, UUID> {
 
     @Query("SELECT COUNT(m) FROM MasterKey m WHERE m.status = 'ACTIVE'")
     long countActiveMasterKeys();
+
+    // Count methods for statistics
+    long countByStatus(MasterKey.KeyStatus status);
+
+    long countByGenerationMethod(String generationMethod);
 }

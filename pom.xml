@@ -149,6 +149,12 @@
 			<artifactId>thymeleaf-layout-dialect</artifactId>
 		</dependency>
 
+		<!-- Thymeleaf Spring Security Integration -->
+		<dependency>
+			<groupId>org.thymeleaf.extras</groupId>
+			<artifactId>thymeleaf-extras-springsecurity6</artifactId>
+		</dependency>
+
 		<!-- BouncyCastle for Argon2 password encoding -->
 		<dependency>
 			<groupId>org.bouncycastle</groupId>
