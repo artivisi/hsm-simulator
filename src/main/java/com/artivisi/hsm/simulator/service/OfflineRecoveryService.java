@@ -1,8 +1,11 @@
 package com.artivisi.hsm.simulator.service;
 
+import com.artivisi.hsm.simulator.entity.MasterKey;
+import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.crypto.SecretKeyFactory;
@@ -10,6 +13,7 @@ import javax.crypto.spec.PBEKeySpec;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,6 +28,7 @@ import java.util.regex.Pattern;
 public class OfflineRecoveryService {
 
     private final KeyGenerationService keyGenerationService;
+    private final MasterKeyRepository masterKeyRepository;
 
     /**
      * Parses a key share file and extracts share information
@@ -245,6 +250,62 @@ public class OfflineRecoveryService {
             result.append(String.format("%02x", b));
         }
         return result.toString();
+    }
+
+    /**
+     * Loads a reconstructed master key into the HSM (database)
+     */
+    @Transactional
+    public String loadIntoHSM(OfflineRecoveryResult recoveryResult) {
+        log.info("Loading reconstructed key into HSM: {}", recoveryResult.getCeremonyName());
+
+        if (!recoveryResult.isSuccess()) {
+            throw new IllegalArgumentException("Cannot load failed recovery result");
+        }
+
+        if (!recoveryResult.isVerified() && recoveryResult.isCanVerify()) {
+            log.warn("Loading unverified key - fingerprint mismatch detected");
+        }
+
+        // Generate master key ID
+        String masterKeyId = "MK-RECOVERED-" + LocalDateTime.now().getYear() + "-" +
+                             UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        // Create MasterKey entity
+        MasterKey masterKey = MasterKey.builder()
+                .masterKeyId(masterKeyId)
+                .keyCeremony(null) // No ceremony for recovered keys
+                .keyType("HSM_MASTER_KEY")
+                .algorithm("AES")
+                .keySize(256)
+                .keyDataEncrypted(recoveryResult.getReconstructedKey())
+                .keyFingerprint(recoveryResult.getReconstructedFingerprint())
+                .keyChecksum(calculateChecksum(recoveryResult.getReconstructedKey()))
+                .combinedEntropyHash("RECOVERED_KEY_NO_ENTROPY_HASH") // Placeholder for recovered keys
+                .generationMethod("RECOVERED")
+                .kdfIterations(0) // Not applicable for recovered keys
+                .kdfSalt("RECOVERED_KEY_NO_KDF_SALT") // Placeholder for recovered keys
+                .status(MasterKey.KeyStatus.ACTIVE)
+                .activatedAt(LocalDateTime.now())
+                .build();
+
+        masterKey = masterKeyRepository.save(masterKey);
+
+        log.info("Master key loaded into HSM with ID: {}", masterKeyId);
+        return masterKeyId;
+    }
+
+    /**
+     * Calculates a simple checksum for the key
+     */
+    private String calculateChecksum(byte[] keyData) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] hash = digest.digest(keyData);
+            return bytesToHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to calculate checksum", e);
+        }
     }
 
     // ===== Data Classes =====

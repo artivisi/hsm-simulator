@@ -90,6 +90,58 @@ public class KeyRecoveryController {
     }
 
     /**
+     * Loads reconstructed key into HSM (database)
+     * Reconstructs the key server-side from uploaded files to avoid byte array serialization issues
+     */
+    @PostMapping("/offline/load")
+    @ResponseBody
+    public ResponseEntity<?> loadReconstructedKey(@RequestParam("files") List<MultipartFile> files,
+                                                   @RequestParam("passphrases") List<String> passphrases) {
+        log.info("Loading reconstructed key into HSM from {} share files", files.size());
+
+        try {
+            if (files.size() != passphrases.size()) {
+                throw new IllegalArgumentException("Number of files must match number of passphrases");
+            }
+
+            // Parse and reconstruct the key server-side
+            List<OfflineRecoveryService.ShareWithPassphrase> sharesWithPassphrases = new ArrayList<>();
+
+            for (int i = 0; i < files.size(); i++) {
+                OfflineRecoveryService.ParsedShare share = offlineRecoveryService.parseShareFile(files.get(i));
+                sharesWithPassphrases.add(OfflineRecoveryService.ShareWithPassphrase.builder()
+                        .share(share)
+                        .passphrase(passphrases.get(i))
+                        .build());
+            }
+
+            // Reconstruct the key
+            OfflineRecoveryService.OfflineRecoveryResult recoveryResult =
+                    offlineRecoveryService.reconstructFromFiles(sharesWithPassphrases);
+
+            if (!recoveryResult.isSuccess()) {
+                throw new IllegalStateException("Key reconstruction failed: " + recoveryResult.getMessage());
+            }
+
+            // Load into HSM
+            String masterKeyId = offlineRecoveryService.loadIntoHSM(recoveryResult);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "masterKeyId", masterKeyId,
+                    "message", "Master key successfully loaded into HSM"
+            ));
+
+        } catch (Exception e) {
+            log.error("Error loading key into HSM", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
      * Reconstructs key from uploaded files with passphrases
      */
     @PostMapping("/offline/reconstruct")

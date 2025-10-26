@@ -35,7 +35,7 @@ public class MasterKey {
     private String masterKeyId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "id_key_ceremony", nullable = false, foreignKey = @ForeignKey(name = "fk_master_key_ceremony"))
+    @JoinColumn(name = "id_key_ceremony", nullable = true, foreignKey = @ForeignKey(name = "fk_master_key_ceremony"))
     private KeyCeremony keyCeremony;
 
     @Column(name = "key_type", nullable = false, length = 50)
@@ -57,7 +57,7 @@ public class MasterKey {
     @Column(name = "key_checksum", nullable = false)
     private String keyChecksum;
 
-    @Column(name = "combined_entropy_hash", nullable = false)
+    @Column(name = "combined_entropy_hash", nullable = true)
     private String combinedEntropyHash;
 
     @Column(name = "generation_method", nullable = false, length = 50)

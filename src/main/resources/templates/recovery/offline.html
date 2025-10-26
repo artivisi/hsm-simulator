@@ -208,14 +208,29 @@
                 </div>
             </div>
 
-            <button onclick="resetForm()" class="mt-6 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
-                Reconstruct Another Key
-            </button>
+            <div class="mt-6 flex gap-4">
+                <button onclick="loadIntoHSM()" id="loadHsmBtn" class="px-8 py-4 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
+                    <span id="loadHsmBtnText">Load into HSM</span>
+                    <span id="loadHsmBtnSpinner" class="hidden">
+                        <svg class="inline w-4 h-4 animate-spin mr-2" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Loading...
+                    </span>
+                </button>
+                <button onclick="resetForm()" class="px-6 py-3 border border-slate-600 text-slate-300 font-medium rounded-lg hover:bg-slate-700 transition-colors">
+                    Reconstruct Another Key
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
         let parsedShares = [];
+        let currentRecoveryResult = null;
+        let currentFiles = null;
+        let currentPassphrases = null;
 
         function parseFiles() {
             const fileInput = document.getElementById('shareFiles');
@@ -321,6 +336,10 @@
                 return;
             }
 
+            // Store files and passphrases for later use in loadIntoHSM
+            currentFiles = files;
+            currentPassphrases = passphrases;
+
             if (!confirm('Reconstruct the master key from uploaded shares?')) {
                 return;
             }
@@ -367,6 +386,9 @@
             console.log('Display result called with:', result);
             console.log('result.verified:', result.verified, 'type:', typeof result.verified);
 
+            // Store result for loading into HSM
+            currentRecoveryResult = result;
+
             document.getElementById('parsedSharesSection').classList.add('hidden');
             document.getElementById('resultSection').classList.remove('hidden');
             document.getElementById('successResult').classList.remove('hidden');
@@ -398,7 +420,65 @@
 
         function resetForm() {
             clearFiles();
+            currentRecoveryResult = null;
             window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function loadIntoHSM() {
+            if (!currentRecoveryResult) {
+                alert('No reconstructed key available');
+                return;
+            }
+
+            if (!currentFiles || !currentPassphrases) {
+                alert('Share files and passphrases are no longer available. Please reconstruct the key again.');
+                return;
+            }
+
+            if (!confirm('Load the reconstructed master key into the HSM?\n\nThis will create a new RECOVERED master key entry in the database.')) {
+                return;
+            }
+
+            const loadBtn = document.getElementById('loadHsmBtn');
+            const loadBtnText = document.getElementById('loadHsmBtnText');
+            const loadBtnSpinner = document.getElementById('loadHsmBtnSpinner');
+
+            loadBtn.disabled = true;
+            loadBtnText.classList.add('hidden');
+            loadBtnSpinner.classList.remove('hidden');
+
+            try {
+                // Reconstruct server-side by sending files and passphrases
+                const formData = new FormData();
+                for (let i = 0; i < currentFiles.length; i++) {
+                    formData.append('files', currentFiles[i]);
+                    formData.append('passphrases', currentPassphrases[i]);
+                }
+
+                const response = await fetch('/hsm/recovery/offline/load', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Master key successfully loaded into HSM!\n\nMaster Key ID: ' + result.masterKeyId);
+                    // Redirect to key management page (to be implemented)
+                    window.location.href = '/';
+                } else {
+                    alert('Error loading key: ' + result.error);
+                    loadBtn.disabled = false;
+                    loadBtnText.classList.remove('hidden');
+                    loadBtnSpinner.classList.add('hidden');
+                }
+            } catch (error) {
+                console.error('Error loading into HSM:', error);
+                alert('An unexpected error occurred');
+                loadBtn.disabled = false;
+                loadBtnText.classList.remove('hidden');
+                loadBtnSpinner.classList.add('hidden');
+            }
         }
 
         // Passphrase Modal Functions
