@@ -70,7 +70,7 @@ CREATE TABLE ceremony_custodians (
     id_key_ceremony UUID NOT NULL,
     id_key_custodian UUID NOT NULL,
     custodian_order INTEGER NOT NULL, -- Order in the ceremony (1, 2, 3, etc.)
-    custodian_label VARCHAR(10) NOT NULL, -- A, B, C, etc.
+    custodian_label VARCHAR(50) NOT NULL, -- Custodian A, Custodian B, etc.
     contribution_token VARCHAR(255) UNIQUE NOT NULL,
     contribution_link TEXT,
     invitation_sent_at TIMESTAMP,

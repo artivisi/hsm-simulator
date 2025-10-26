@@ -50,7 +50,7 @@ public class CeremonyCustodian {
     @Column(name = "custodian_order", nullable = false)
     private Integer custodianOrder;
 
-    @Column(name = "custodian_label", nullable = false, length = 10)
+    @Column(name = "custodian_label", nullable = false, length = 50)
     private String custodianLabel;
 
     @Column(name = "contribution_token", nullable = false, unique = true)

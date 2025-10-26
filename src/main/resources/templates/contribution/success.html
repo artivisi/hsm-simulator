@@ -43,9 +43,7 @@
                 <div>
                     <p class="text-sm text-slate-400">Passphrase Strength</p>
                     <p class="text-lg font-semibold"
-                       th:classappend="${param.strength[0] == 'VERY_STRONG'} ? 'text-green-400' :
-                                      ${param.strength[0] == 'STRONG'} ? 'text-blue-400' :
-                                      ${param.strength[0] == 'GOOD'} ? 'text-yellow-400' : 'text-orange-400'"
+                       th:classappend="${param.strength[0] == 'VERY_STRONG' ? 'text-green-400' : (param.strength[0] == 'STRONG' ? 'text-blue-400' : (param.strength[0] == 'GOOD' ? 'text-yellow-400' : 'text-orange-400'))}"
                        th:text="${param.strength[0]}">VERY_STRONG</p>
                 </div>
                 <div>

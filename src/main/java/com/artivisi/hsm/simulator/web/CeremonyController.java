@@ -214,49 +214,38 @@ public class CeremonyController {
     /**
      * Downloads a share as text file
      */
-    @GetMapping("/api/shares/{shareId}/download")
+    @GetMapping("/api/shares/{share}/download")
     @ResponseBody
-    public ResponseEntity<byte[]> downloadShare(@PathVariable UUID shareId) {
-        log.info("Downloading share: {}", shareId);
+    public ResponseEntity<byte[]> downloadShare(@PathVariable KeyShare share) {
+        log.info("Downloading share: {}", share.getShareId());
 
-        try {
-            byte[] shareData = shareDistributionService.generateShareDownload(shareId);
+        byte[] shareData = shareDistributionService.generateShareDownload(share);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.TEXT_PLAIN);
-            headers.setContentDispositionFormData("attachment", "key-share-" + shareId + ".txt");
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.TEXT_PLAIN);
+        headers.setContentDispositionFormData("attachment", "key-share-" + share.getShareId() + ".txt");
 
-            return ResponseEntity.ok()
-                    .headers(headers)
-                    .body(shareData);
-
-        } catch (IllegalArgumentException e) {
-            log.error("Share not found: {}", shareId);
-            return ResponseEntity.notFound().build();
-        }
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(shareData);
     }
 
     /**
      * Sends share via email (simulated for MVP)
      */
-    @PostMapping("/api/shares/{shareId}/email")
+    @PostMapping("/api/shares/{share}/email")
     @ResponseBody
-    public ResponseEntity<?> emailShare(@PathVariable UUID shareId) {
-        log.info("Sending share via email: {}", shareId);
+    public ResponseEntity<?> emailShare(@PathVariable KeyShare share) {
+        log.info("Sending share via email: {}", share.getShareId());
 
         try {
-            shareDistributionService.sendShareViaEmail(shareId);
+            shareDistributionService.sendShareViaEmail(share);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
                     "message", "Share sent via email successfully"
             ));
 
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of(
-                    "success", false,
-                    "error", "Share not found"
-            ));
         } catch (Exception e) {
             log.error("Error sending email", e);
             return ResponseEntity.internalServerError().body(Map.of(
@@ -269,17 +258,17 @@ public class CeremonyController {
     /**
      * Marks a share as distributed
      */
-    @PostMapping("/api/shares/{shareId}/mark-distributed")
+    @PostMapping("/api/shares/{share}/mark-distributed")
     @ResponseBody
-    public ResponseEntity<?> markShareDistributed(@PathVariable UUID shareId,
+    public ResponseEntity<?> markShareDistributed(@PathVariable KeyShare share,
                                                    @RequestBody Map<String, String> request) {
-        log.info("Marking share as distributed: {}", shareId);
+        log.info("Marking share as distributed: {}", share.getShareId());
 
         try {
             String method = request.getOrDefault("method", "MANUAL");
             KeyShare.DistributionMethod distributionMethod = KeyShare.DistributionMethod.valueOf(method);
 
-            shareDistributionService.markAsDistributed(shareId, distributionMethod);
+            shareDistributionService.markAsDistributed(share, distributionMethod);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,

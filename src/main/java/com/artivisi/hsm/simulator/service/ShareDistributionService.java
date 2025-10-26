@@ -76,11 +76,8 @@ public class ShareDistributionService {
      * Generates downloadable share data in text format
      */
     @Transactional
-    public byte[] generateShareDownload(UUID shareId) {
-        log.info("Generating download for share: {}", shareId);
-
-        KeyShare share = shareRepository.findByShareId(shareId.toString())
-                .orElseThrow(() -> new IllegalArgumentException("Share not found"));
+    public byte[] generateShareDownload(KeyShare share) {
+        log.info("Generating download for share: {}", share.getShareId());
 
         CeremonyCustodian ceremonyCustodian = share.getCeremonyCustodian();
         MasterKey masterKey = share.getMasterKey();
@@ -170,11 +167,8 @@ public class ShareDistributionService {
      * Marks a share as distributed
      */
     @Transactional
-    public void markAsDistributed(UUID shareId, KeyShare.DistributionMethod method) {
-        log.info("Marking share {} as distributed via {}", shareId, method);
-
-        KeyShare share = shareRepository.findByShareId(shareId.toString())
-                .orElseThrow(() -> new IllegalArgumentException("Share not found"));
+    public void markAsDistributed(KeyShare share, KeyShare.DistributionMethod method) {
+        log.info("Marking share {} as distributed via {}", share.getShareId(), method);
 
         share.setDistributedAt(LocalDateTime.now());
         share.setDistributionMethod(method);
@@ -187,11 +181,8 @@ public class ShareDistributionService {
      * Sends share via email with attachment
      */
     @Transactional
-    public void sendShareViaEmail(UUID shareId) {
-        log.info("Sending share via email: {}", shareId);
-
-        KeyShare share = shareRepository.findByShareId(shareId.toString())
-                .orElseThrow(() -> new IllegalArgumentException("Share not found"));
+    public void sendShareViaEmail(KeyShare share) {
+        log.info("Sending share via email: {}", share.getShareId());
 
         CeremonyCustodian ceremonyCustodian = share.getCeremonyCustodian();
         MasterKey masterKey = share.getMasterKey();
@@ -200,7 +191,7 @@ public class ShareDistributionService {
         String custodianName = ceremonyCustodian.getKeyCustodian().getFullName();
 
         // Generate share download content
-        byte[] shareContent = generateShareDownload(shareId);
+        byte[] shareContent = generateShareDownload(share);
 
         // Build HTML email content
         String htmlContent = buildShareEmailHtml(
@@ -223,7 +214,7 @@ public class ShareDistributionService {
             );
 
             // Mark as distributed
-            markAsDistributed(UUID.fromString(share.getId().toString()), KeyShare.DistributionMethod.EMAIL);
+            markAsDistributed(share, KeyShare.DistributionMethod.EMAIL);
 
             // Log appropriate message based on whether email was actually sent
             if (emailService.isEmailEnabled()) {
@@ -345,10 +336,7 @@ public class ShareDistributionService {
      * Gets share details for viewing
      */
     @Transactional(readOnly = true)
-    public ShareDetailResponse getShareDetail(UUID shareId) {
-        KeyShare share = shareRepository.findByShareId(shareId.toString())
-                .orElseThrow(() -> new IllegalArgumentException("Share not found"));
-
+    public ShareDetailResponse getShareDetail(KeyShare share) {
         CeremonyCustodian ceremonyCustodian = share.getCeremonyCustodian();
         MasterKey masterKey = share.getMasterKey();
 

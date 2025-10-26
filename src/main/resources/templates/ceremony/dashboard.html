@@ -129,9 +129,7 @@
                         </p>
                         <p class="text-sm text-slate-400 mt-1">
                             Strength:
-                            <span th:classappend="${custodianStatus.passphraseStrength.name() == 'VERY_STRONG'} ? 'text-green-400' :
-                                                 ${custodianStatus.passphraseStrength.name() == 'STRONG'} ? 'text-blue-400' :
-                                                 ${custodianStatus.passphraseStrength.name() == 'GOOD'} ? 'text-yellow-400' : 'text-orange-400'"
+                            <span th:classappend="${custodianStatus.passphraseStrength.name() == 'VERY_STRONG' ? 'text-green-400' : (custodianStatus.passphraseStrength.name() == 'STRONG' ? 'text-blue-400' : (custodianStatus.passphraseStrength.name() == 'GOOD' ? 'text-yellow-400' : 'text-orange-400'))}"
                                   th:text="${custodianStatus.passphraseStrength.name()}">VERY_STRONG</span>
                             | Entropy: <span class="text-slate-300" th:text="${custodianStatus.entropyScore} + '/10'">8.5/10</span>
                         </p>

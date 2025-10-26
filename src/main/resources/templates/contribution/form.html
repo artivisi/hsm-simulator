@@ -31,7 +31,7 @@
                 <p class="text-lg font-semibold text-white" th:text="${ceremonyName}">HSM Initialization 2025</p>
                 <p class="text-sm text-slate-400" th:text="${ceremonyPurpose}">Purpose of the ceremony</p>
                 <p th:if="${deadline}" class="text-sm text-yellow-300">
-                    Deadline: <span th:text="${#temporals.format(deadline, 'MMMM dd, yyyy \'at\' HH:mm')}">October 25, 2025 at 18:00</span>
+                    Deadline: <span th:text="${#temporals.format(deadline, 'MMMM dd, yyyy ''at'' HH:mm')}">October 25, 2025 at 18:00</span>
                 </p>
             </div>
         </div>
