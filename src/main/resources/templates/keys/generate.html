@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Generate Keys</title>
+    <meta name="_csrf" th:content="${_csrf.token}"/>
+    <meta name="_csrf_header" th:content="${_csrf.headerName}"/>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="mb-8">
+            <h1 class="text-3xl font-bold text-slate-900 mb-2">Generate Cryptographic Keys</h1>
+            <p class="text-slate-600">Create new master keys, terminal keys, and zone keys</p>
+        </div>
+
+        <!-- Key Type Tabs -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="border-b border-slate-200">
+                <nav class="flex -mb-px">
+                    <button onclick="switchTab('tmk')" id="tab-tmk" class="tab-btn active px-6 py-4 text-sm font-medium border-b-2 border-blue-600 text-blue-600">
+                        Terminal Master Key (TMK)
+                    </button>
+                    <button onclick="switchTab('tpk')" id="tab-tpk" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300">
+                        Terminal PIN Key (TPK)
+                    </button>
+                    <button onclick="switchTab('tsk')" id="tab-tsk" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300">
+                        Terminal Security Key (TSK)
+                    </button>
+                    <button onclick="switchTab('zmk')" id="tab-zmk" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300">
+                        Zone Master Key (ZMK)
+                    </button>
+                    <button onclick="switchTab('zpk')" id="tab-zpk" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300">
+                        Zone PIN Key (ZPK)
+                    </button>
+                    <button onclick="switchTab('zsk')" id="tab-zsk" class="tab-btn px-6 py-4 text-sm font-medium border-b-2 border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300">
+                        Zone Session Key (ZSK)
+                    </button>
+                </nav>
+            </div>
+
+            <div class="p-8">
+                <!-- TMK Form -->
+                <div id="form-tmk" class="tab-content">
+                    <h3 class="text-lg font-semibold text-slate-900 mb-4">Generate Terminal Master Key</h3>
+                    <p class="text-sm text-slate-600 mb-6">Terminal Master Keys are used to protect terminal-specific keys (TPK, TSK)</p>
+
+                    <form id="tmkForm" onsubmit="generateTMK(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Bank <span class="text-red-600">*</span></label>
+                                <select name="bankId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="">Select a bank...</option>
+                                    <option th:each="bank : ${banks}" th:value="${bank.id}" th:text="${bank.bankName + ' (' + bank.bankCode + ')'}"></option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Key Size</label>
+                                <select name="keySize" class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="128">128 bits</option>
+                                    <option value="192">192 bits</option>
+                                    <option value="256" selected>256 bits</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Description</label>
+                                <textarea name="description" rows="3" class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900" placeholder="Optional description"></textarea>
+                            </div>
+
+                            <button type="submit" class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                                Generate TMK
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- TPK Form -->
+                <div id="form-tpk" class="tab-content hidden">
+                    <h3 class="text-lg font-semibold text-slate-900 mb-4">Generate Terminal PIN Key</h3>
+                    <p class="text-sm text-slate-600 mb-6">TPK is derived from TMK and used for PIN encryption at the terminal</p>
+
+                    <form id="tpkForm" onsubmit="generateTPK(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Parent TMK <span class="text-red-600">*</span></label>
+                                <select name="tmkId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="">Select TMK...</option>
+                                    <option th:each="tmk : ${tmks}" th:value="${tmk.id}" th:text="${tmk.masterKeyId}"></option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Terminal <span class="text-red-600">*</span></label>
+                                <select name="terminalId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="">Select terminal...</option>
+                                    <option th:each="terminal : ${terminals}" th:value="${terminal.id}" th:text="${terminal.terminalId + ' (' + terminal.terminalType + ')'}"></option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                                Generate TPK
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- TSK Form -->
+                <div id="form-tsk" class="tab-content hidden">
+                    <h3 class="text-lg font-semibold text-slate-900 mb-4">Generate Terminal Security Key</h3>
+                    <p class="text-sm text-slate-600 mb-6">TSK is derived from TMK and used for MAC generation at the terminal</p>
+
+                    <form id="tskForm" onsubmit="generateTSK(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Parent TMK <span class="text-red-600">*</span></label>
+                                <select name="tmkId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="">Select TMK...</option>
+                                    <option th:each="tmk : ${tmks}" th:value="${tmk.id}" th:text="${tmk.masterKeyId}"></option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Terminal <span class="text-red-600">*</span></label>
+                                <select name="terminalId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="">Select terminal...</option>
+                                    <option th:each="terminal : ${terminals}" th:value="${terminal.id}" th:text="${terminal.terminalId + ' (' + terminal.terminalType + ')'}"></option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                                Generate TSK
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ZMK Form -->
+                <div id="form-zmk" class="tab-content hidden">
+                    <h3 class="text-lg font-semibold text-slate-900 mb-4">Generate Zone Master Key</h3>
+                    <p class="text-sm text-slate-600 mb-6">ZMK is used to protect inter-bank communication keys (ZPK, ZSK)</p>
+
+                    <form id="zmkForm" onsubmit="generateZMK(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Bank <span class="text-red-600">*</span></label>
+                                <select name="bankId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="">Select a bank...</option>
+                                    <option th:each="bank : ${banks}" th:value="${bank.id}" th:text="${bank.bankName + ' (' + bank.bankCode + ')'}"></option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Key Size</label>
+                                <select name="keySize" class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="128">128 bits</option>
+                                    <option value="192">192 bits</option>
+                                    <option value="256" selected>256 bits</option>
+                                </select>
+                            </div>
+
+                            <button type="submit" class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                                Generate ZMK
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ZPK Form -->
+                <div id="form-zpk" class="tab-content hidden">
+                    <h3 class="text-lg font-semibold text-slate-900 mb-4">Generate Zone PIN Key</h3>
+                    <p class="text-sm font-medium text-slate-600 mb-6">ZPK is derived from ZMK and used for PIN encryption between banks</p>
+
+                    <form id="zpkForm" onsubmit="generateZPK(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Parent ZMK <span class="text-red-600">*</span></label>
+                                <select name="zmkId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="">Select ZMK...</option>
+                                    <option th:each="zmk : ${zmks}" th:value="${zmk.id}" th:text="${zmk.masterKeyId}"></option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Zone Identifier <span class="text-red-600">*</span></label>
+                                <input type="text" name="zoneIdentifier" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900" placeholder="e.g., BANK1-BANK2">
+                                <p class="mt-1 text-sm text-slate-500">Unique identifier for the inter-bank zone</p>
+                            </div>
+
+                            <button type="submit" class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                                Generate ZPK
+                            </button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- ZSK Form -->
+                <div id="form-zsk" class="tab-content hidden">
+                    <h3 class="text-lg font-semibold text-slate-900 mb-4">Generate Zone Session Key</h3>
+                    <p class="text-sm text-slate-600 mb-6">ZSK is derived from ZMK and used for data encryption between banks</p>
+
+                    <form id="zskForm" onsubmit="generateZSK(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Parent ZMK <span class="text-red-600">*</span></label>
+                                <select name="zmkId" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900">
+                                    <option value="">Select ZMK...</option>
+                                    <option th:each="zmk : ${zmks}" th:value="${zmk.id}" th:text="${zmk.masterKeyId}"></option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-2">Zone Identifier <span class="text-red-600">*</span></label>
+                                <input type="text" name="zoneIdentifier" required class="w-full bg-white border border-slate-300 rounded-lg px-4 py-2 text-slate-900" placeholder="e.g., BANK1-BANK2">
+                                <p class="mt-1 text-sm text-slate-500">Unique identifier for the inter-bank zone</p>
+                            </div>
+
+                            <button type="submit" class="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors">
+                                Generate ZSK
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script th:inline="javascript">
+        function switchTab(tabName) {
+            // Hide all content
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            // Remove active from all tabs
+            document.querySelectorAll('.tab-btn').forEach(el => {
+                el.classList.remove('active', 'border-blue-600', 'text-blue-600');
+                el.classList.add('border-transparent', 'text-slate-600');
+            });
+            // Show selected content
+            document.getElementById('form-' + tabName).classList.remove('hidden');
+            // Activate selected tab
+            const activeTab = document.getElementById('tab-' + tabName);
+            activeTab.classList.add('active', 'border-blue-600', 'text-blue-600');
+            activeTab.classList.remove('border-transparent', 'text-slate-600');
+        }
+
+        async function generateKey(event, endpoint, keyType) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+
+            // Get CSRF token
+            const token = document.querySelector('meta[name="_csrf"]').getAttribute('content');
+            const header = document.querySelector('meta[name="_csrf_header"]').getAttribute('content');
+
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        [header]: token,
+                        'Content-Type': 'application/x-www-form-urlencoded'
+                    },
+                    body: new URLSearchParams(formData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert(`${keyType} generated successfully!\n\nKey ID: ${result.keyId}\nFingerprint: ${result.fingerprint}`);
+                    form.reset();
+                    window.location.href = '/keys';
+                } else {
+                    alert(`Error: ${result.error}`);
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('An unexpected error occurred');
+            }
+        }
+
+        function generateTMK(event) {
+            return generateKey(event, '/keys/api/generate/tmk', 'TMK');
+        }
+
+        function generateTPK(event) {
+            return generateKey(event, '/keys/api/generate/tpk', 'TPK');
+        }
+
+        function generateTSK(event) {
+            return generateKey(event, '/keys/api/generate/tsk', 'TSK');
+        }
+
+        function generateZMK(event) {
+            return generateKey(event, '/keys/api/generate/zmk', 'ZMK');
+        }
+
+        function generateZPK(event) {
+            return generateKey(event, '/keys/api/generate/zpk', 'ZPK');
+        }
+
+        function generateZSK(event) {
+            return generateKey(event, '/keys/api/generate/zsk', 'ZSK');
+        }
+    </script>
+</div>
+</body>
+</html>

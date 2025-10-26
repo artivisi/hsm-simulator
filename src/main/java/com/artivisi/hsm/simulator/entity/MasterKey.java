@@ -38,6 +38,12 @@ public class MasterKey {
     @JoinColumn(name = "id_key_ceremony", nullable = true, foreignKey = @ForeignKey(name = "fk_master_key_ceremony"))
     private KeyCeremony keyCeremony;
 
+    @Column(name = "parent_key_id")
+    private UUID parentKeyId;
+
+    @Column(name = "rotated_from_key_id")
+    private UUID rotatedFromKeyId;
+
     @Column(name = "key_type", nullable = false, length = 50)
     @Builder.Default
     private String keyType = "HSM_MASTER_KEY";

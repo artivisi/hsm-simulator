@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org"
+      xmlns:layout="http://www.ultraq.net.nz/thymeleaf/layout"
+      layout:decorate="~{layout/main}">
+<head>
+    <title>Key Hierarchy</title>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+</head>
+<body>
+<div layout:fragment="content">
+    <div class="w-full mx-auto px-4">
+        <!-- Header -->
+        <div class="mb-8 flex items-center justify-between">
+            <div>
+                <h1 class="text-3xl font-bold text-slate-900 mb-2">Key Hierarchy Visualization</h1>
+                <p class="text-slate-600">Visual representation of cryptographic key relationships and hierarchies</p>
+            </div>
+            <div class="flex gap-3">
+                <a href="/keys" class="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white font-medium rounded-lg transition-colors">
+                    Back to Keys
+                </a>
+                <a href="/keys/generate" class="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors">
+                    + Generate New Key
+                </a>
+            </div>
+        </div>
+
+        <!-- Statistics -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Total Keys</span>
+                    <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-2xl font-bold text-slate-900" th:text="${totalKeys}">0</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Active Keys</span>
+                    <div class="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-sm text-slate-500 mt-2">Green nodes in diagram</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Rotated Keys</span>
+                    <div class="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-sm text-slate-500 mt-2">Orange nodes in diagram</p>
+            </div>
+
+            <div class="bg-white border border-slate-200 rounded-lg p-6">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm text-slate-600">Revoked Keys</span>
+                    <div class="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                        <svg class="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/>
+                        </svg>
+                    </div>
+                </div>
+                <p class="text-sm text-slate-500 mt-2">Red nodes in diagram</p>
+            </div>
+        </div>
+
+        <!-- Legend -->
+        <div class="bg-white border border-slate-200 rounded-lg p-6 mb-8">
+            <h3 class="text-lg font-semibold text-slate-900 mb-4">Legend</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="flex items-center gap-3">
+                    <div class="w-4 h-4 bg-green-500 rounded"></div>
+                    <span class="text-sm text-slate-600">Active Key - Currently in use</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-4 h-4 bg-red-500 rounded"></div>
+                    <span class="text-sm text-slate-600">Revoked Key - No longer valid</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-4 h-4 bg-yellow-500 rounded"></div>
+                    <span class="text-sm text-slate-600">Rotated Key - Replaced by newer key</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="w-4 h-4 bg-slate-500 rounded"></div>
+                    <span class="text-sm text-slate-600">Expired Key - Past expiration date</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-slate-600">→ Solid arrow: Parent-child relationship</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <span class="text-sm text-slate-600">-.-> Dashed arrow: Key rotation</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Diagram Container -->
+        <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+            <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                <h2 class="text-lg font-semibold text-slate-900">Hierarchy Diagram</h2>
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-slate-600 mr-2">Zoom:</span>
+                    <button onclick="zoomOut()" class="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded">−</button>
+                    <span id="zoomLevel" class="text-sm text-slate-700 font-mono w-12 text-center">100%</span>
+                    <button onclick="zoomIn()" class="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded">+</button>
+                    <button onclick="resetZoom()" class="px-3 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 text-sm font-medium rounded ml-2">Reset</button>
+                </div>
+            </div>
+
+            <div class="p-8 overflow-auto" style="max-height: 800px;">
+                <div id="diagramContainer" style="transform-origin: top left; transition: transform 0.2s;">
+                    <div class="mermaid" style="min-height: 600px;" th:text="${mermaidDiagram}">
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Key Types Explanation -->
+        <div class="bg-white border border-slate-200 rounded-lg p-6 mt-8">
+            <h3 class="text-lg font-semibold text-slate-900 mb-4">Key Types</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <h4 class="font-semibold text-slate-800 mb-2">Terminal Key Hierarchy</h4>
+                    <ul class="space-y-2 text-sm text-slate-600">
+                        <li><strong>TMK</strong> - Terminal Master Key: Root key for terminal operations</li>
+                        <li><strong>TPK</strong> - Terminal PIN Key: Derived from TMK, encrypts PINs</li>
+                        <li><strong>TSK</strong> - Terminal Security Key: Derived from TMK, generates MACs</li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-slate-800 mb-2">Zone Key Hierarchy</h4>
+                    <ul class="space-y-2 text-sm text-slate-600">
+                        <li><strong>ZMK</strong> - Zone Master Key: Root key for inter-bank communication</li>
+                        <li><strong>ZPK</strong> - Zone PIN Key: Derived from ZMK, inter-bank PIN encryption</li>
+                        <li><strong>ZSK</strong> - Zone Session Key: Derived from ZMK, session data encryption</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentZoom = 1.0;
+
+        mermaid.initialize({
+            startOnLoad: true,
+            theme: 'default',
+            flowchart: {
+                useMaxWidth: false,
+                htmlLabels: true,
+                curve: 'basis',
+                nodeSpacing: 100,
+                rankSpacing: 100,
+                padding: 20
+            },
+            themeVariables: {
+                fontSize: '16px'
+            }
+        });
+
+        function zoomIn() {
+            currentZoom = Math.min(currentZoom + 0.2, 3.0);
+            applyZoom();
+        }
+
+        function zoomOut() {
+            currentZoom = Math.max(currentZoom - 0.2, 0.4);
+            applyZoom();
+        }
+
+        function resetZoom() {
+            currentZoom = 1.0;
+            applyZoom();
+        }
+
+        function applyZoom() {
+            const container = document.getElementById('diagramContainer');
+            container.style.transform = `scale(${currentZoom})`;
+            document.getElementById('zoomLevel').textContent = Math.round(currentZoom * 100) + '%';
+        }
+    </script>
+</div>
+</body>
+</html>

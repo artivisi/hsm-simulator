@@ -48,6 +48,11 @@ public class KeyManagementController {
         long recoveredKeys = masterKeyRepository.countByGenerationMethod("RECOVERED");
         long revokedKeys = masterKeyRepository.countByStatus(MasterKey.KeyStatus.REVOKED);
 
+        // Calculate pagination display values
+        long showingFrom = masterKeysPage.getNumber() * masterKeysPage.getSize() + 1;
+        long showingTo = Math.min((masterKeysPage.getNumber() + 1) * masterKeysPage.getSize(),
+                                   masterKeysPage.getTotalElements());
+
         model.addAttribute("masterKeysPage", masterKeysPage);
         model.addAttribute("totalKeys", totalKeys);
         model.addAttribute("activeKeys", activeKeys);
@@ -57,6 +62,8 @@ public class KeyManagementController {
         model.addAttribute("pageSize", size);
         model.addAttribute("sortBy", sortBy);
         model.addAttribute("direction", direction);
+        model.addAttribute("showingFrom", showingFrom);
+        model.addAttribute("showingTo", showingTo);
 
         return "keys/list";
     }
