@@ -15,11 +15,10 @@ The HSM Simulator uses PostgreSQL 17 with Flyway migrations for version control.
 
 | Version | Description | File |
 |---------|-------------|------|
-| V1 | Key ceremony and cryptographic key management tables | `V1__create_key_ceremony_tables.sql` |
-| V2 | Sample data: banks, terminals, key custodians | `V2__insert_sample_key_custodians.sql` |
-| V3 | User authentication and authorization | `V3__create_users_table.sql` |
-| V4 | PIN generation and management | `V4__create_generated_pins_table.sql` |
-| V5 | MAC generation and verification | `V5__create_generated_macs_table.sql` |
+| V1 | Complete schema creation - all tables for HSM functionality | `V1__create_schema.sql` |
+| V2 | Sample data - banks, terminals, custodians, users | `V2__insert_sample_data.sql` |
+
+**Note**: Schema uses `id_tablename` FK convention (e.g., `id_bank`, `id_key_ceremony`) instead of `tablename_id`.
 
 ---
 
@@ -880,16 +879,16 @@ mvn clean compile  # Flyway runs automatically
 
 ### Creating New Migration
 ```bash
-# Create file: src/main/resources/db/migration/V6__description.sql
+# Create file: src/main/resources/db/migration/V3__description.sql
 ```
 
 ### Migration Naming Convention
 ```
 V{version}__{description}.sql
 Examples:
-  V1__create_key_ceremony_tables.sql
-  V2__insert_sample_key_custodians.sql
-  V3__create_users_table.sql
+  V1__create_schema.sql
+  V2__insert_sample_data.sql
+  V3__add_new_feature.sql
 ```
 
 ---
@@ -903,6 +902,6 @@ Examples:
 
 ---
 
-**Last Updated**: October 26, 2025
-**Schema Version**: V5
+**Last Updated**: October 27, 2025
+**Schema Version**: V2
 **Database**: PostgreSQL 17.6
