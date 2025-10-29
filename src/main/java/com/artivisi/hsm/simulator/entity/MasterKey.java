@@ -38,6 +38,12 @@ public class MasterKey {
     @JoinColumn(name = "id_key_ceremony", nullable = true, foreignKey = @ForeignKey(name = "fk_master_key_ceremony"))
     private KeyCeremony keyCeremony;
 
+    @Column(name = "id_bank")
+    private UUID idBank;
+
+    @Column(name = "id_terminal")
+    private UUID idTerminal;
+
     @Column(name = "parent_key_id")
     private UUID parentKeyId;
 

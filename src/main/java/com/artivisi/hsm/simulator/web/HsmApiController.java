@@ -8,6 +8,7 @@ import com.artivisi.hsm.simulator.entity.GeneratedPin;
 import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
+import com.artivisi.hsm.simulator.service.KeyInitializationService;
 import com.artivisi.hsm.simulator.service.KeyOperationService;
 import com.artivisi.hsm.simulator.service.MacService;
 import com.artivisi.hsm.simulator.service.PinGenerationService;
@@ -32,6 +33,7 @@ public class HsmApiController {
     private final PinGenerationService pinGenerationService;
     private final MacService macService;
     private final KeyOperationService keyOperationService;
+    private final KeyInitializationService keyInitializationService;
     private final MasterKeyRepository masterKeyRepository;
 
     /**
@@ -358,6 +360,79 @@ public class HsmApiController {
             ));
         } catch (Exception e) {
             log.error("Error verifying PIN with PVV", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * POST /api/hsm/keys/initialize
+     * Initialize complete key set for a specific bank or all banks
+     *
+     * This endpoint creates a comprehensive key hierarchy including:
+     * - LMK (Local Master Key) for PIN storage
+     * - TMK (Terminal Master Keys) for specified bank(s)
+     * - TPK (Terminal PIN Keys) for each terminal
+     * - TSK (Terminal Security Keys) for each terminal
+     * - ZMK (Zone Master Keys) for specified bank(s)
+     * - ZPK (Zone PIN Keys) for inter-bank PIN operations
+     * - ZSK (Zone Session Keys) for inter-bank messaging
+     *
+     * Two Setup Modes:
+     *
+     * 1. Shared HSM (Recommended for workshops - single instance):
+     *    - Initialize issuer: {"bankCode": "ISS001"}
+     *    - Initialize acquirer: {"bankCode": "ACQ001", "shareZoneKeysWith": "ISS001"}
+     *    - Both banks share zone keys automatically (no manual copy needed)
+     *    - Each bank has its own LMK, TMK, TPK, TSK
+     *
+     * 2. Multi-HSM (Production simulation - separate instances):
+     *    - Run separate HSM instances (different ports/databases)
+     *    - Initialize each with bankCode only
+     *    - Manually copy zone keys between databases
+     *
+     * Request body (optional):
+     * {
+     *   "bankCode": "ISS001",            // Optional: specific bank code
+     *   "shareZoneKeysWith": "ACQ001",   // Optional: bank code to copy zone keys from
+     *   "clearExisting": true,            // Default: true
+     *   "keySize": 256                   // Default: 256 bits
+     * }
+     */
+    @PostMapping("/keys/initialize")
+    public ResponseEntity<?> initializeKeys(@RequestBody(required = false) Map<String, Object> request) {
+        boolean clearExisting = true; // Default: clear existing sample keys
+        Integer keySize = 256; // Default key size
+        String bankCode = null; // Default: all banks
+        String shareZoneKeysWith = null; // Default: create new zone keys
+
+        if (request != null) {
+            if (request.containsKey("clearExisting")) {
+                clearExisting = (Boolean) request.get("clearExisting");
+            }
+            if (request.containsKey("keySize")) {
+                keySize = (Integer) request.get("keySize");
+            }
+            if (request.containsKey("bankCode")) {
+                bankCode = (String) request.get("bankCode");
+            }
+            if (request.containsKey("shareZoneKeysWith")) {
+                shareZoneKeysWith = (String) request.get("shareZoneKeysWith");
+            }
+        }
+
+        log.info("API: Initializing complete key set (bankCode: {}, shareZoneKeysWith: {}, clearExisting: {}, keySize: {})",
+                 bankCode == null ? "ALL" : bankCode,
+                 shareZoneKeysWith == null ? "NONE" : shareZoneKeysWith,
+                 clearExisting, keySize);
+
+        try {
+            Map<String, Object> result = keyInitializationService.initializeAllKeys(
+                clearExisting, keySize, bankCode, shareZoneKeysWith);
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            log.error("Error initializing keys", e);
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));

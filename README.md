@@ -49,6 +49,7 @@ Dokumentasi lengkap REST API untuk integrasi workshop dan external systems terse
 - `POST /api/hsm/pin/verify` - Verify PIN against stored value (legacy)
 - `POST /api/hsm/mac/generate` - Generate MAC (ISO9797-ALG3, HMAC-SHA256, CBC-MAC)
 - `POST /api/hsm/mac/verify` - Verify MAC authenticity
+- `POST /api/hsm/keys/initialize` - ⚡ Initialize complete key set for all banks (quick HSM setup)
 - `POST /api/hsm/key/generate` - Generate cryptographic key (ZMK, TMK)
 - `POST /api/hsm/key/exchange` - Exchange key between encryption domains
 
