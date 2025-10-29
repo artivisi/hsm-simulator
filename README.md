@@ -42,8 +42,11 @@ Dokumentasi lengkap REST API untuk integrasi workshop dan external systems terse
 - **[API.md](API.md)** - Complete REST API reference dengan request/response examples, cURL commands, dan Java integration code
 
 **API Endpoints:**
-- `POST /api/hsm/pin/encrypt` - Encrypt PIN block (ISO-0, ISO-1, ISO-3, ISO-4)
-- `POST /api/hsm/pin/verify` - Verify PIN against stored value
+- `POST /api/hsm/pin/encrypt` - Encrypt PIN block and generate PVV (ISO-0, ISO-1, ISO-3, ISO-4)
+- `POST /api/hsm/pin/generate-pinblock` - Generate PIN block encrypted with LMK
+- `POST /api/hsm/pin/verify-with-translation` - Verify PIN using PIN block comparison (Method A)
+- `POST /api/hsm/pin/verify-with-pvv` - Verify PIN using PVV method (Method B) ⭐ ISO 9564
+- `POST /api/hsm/pin/verify` - Verify PIN against stored value (legacy)
 - `POST /api/hsm/mac/generate` - Generate MAC (ISO9797-ALG3, HMAC-SHA256, CBC-MAC)
 - `POST /api/hsm/mac/verify` - Verify MAC authenticity
 - `POST /api/hsm/key/generate` - Generate cryptographic key (ZMK, TMK)

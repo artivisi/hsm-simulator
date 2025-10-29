@@ -258,9 +258,79 @@ graph LR
 
 ## 📊 2. PIN Block Storage and Management
 
-Penyimpanan dan manajemen PIN block dalam sistem perbankan.
+Penyimpanan dan manajemen PIN block dalam sistem perbankan. Ada dua metode utama untuk menyimpan data PIN:
 
-### 2.1 Storage Architecture
+### 2.1 Storage Methods Comparison
+
+#### Method A: Encrypted PIN Block Storage
+```mermaid
+graph TB
+    subgraph "Traditional Method"
+        A[Customer enters PIN: 1234] --> B[Generate PIN Block]
+        B --> C[Encrypt with LMK]
+        C --> D[Store Encrypted PIN Block: 32+ hex chars]
+        D --> E[Database Storage]
+    end
+
+    subgraph "Verification Process"
+        E --> F[Retrieve Encrypted PIN Block]
+        F --> G[Decrypt with LMK]
+        G --> H[Compare with Entered PIN]
+    end
+
+    style D fill:#fff3e0
+    style H fill:#e3f2fd
+```
+
+#### Method B: PVV (PIN Verification Value) Storage ⭐ Recommended
+```mermaid
+graph TB
+    subgraph "Modern Method - ISO 9564"
+        A[Customer enters PIN: 1234] --> B[Generate PIN Block]
+        B --> C[Encrypt with LMK]
+        C --> D[Calculate PVV: SHA-256 PIN+PAN]
+        D --> E[Store PVV: 4 digits only]
+        E --> F[Database Storage]
+    end
+
+    subgraph "Verification Process"
+        F --> G[Customer enters PIN at ATM]
+        G --> H[Calculate PVV from entered PIN]
+        H --> I[Compare PVV: 4 digits]
+        I --> J[Faster & More Secure]
+    end
+
+    style E fill:#e8f5e8
+    style J fill:#e8f5e8
+```
+
+**Comparison Table:**
+
+| Aspect | Method A: PIN Block | Method B: PVV ⭐ |
+|--------|---------------------|-----------------|
+| **Storage Size** | 32+ hex characters | 4 digits |
+| **Security** | Reversible with key | One-way function |
+| **Industry Usage** | Legacy/Educational | **ISO 9564 Standard** |
+| **Database Size** | Larger | **Smaller (90% reduction)** |
+| **Compliance** | N/A | **PCI-DSS, ISO 9564** |
+| **Best For** | Educational demos | **Production systems** |
+
+**PVV Calculation Method:**
+```
+Input: PIN (1234) + PAN (4111111111111111)
+Process: SHA-256(PIN + PAN)
+Extract: First 4 decimal digits from hash
+Output: PVV (e.g., "5672")
+```
+
+**Why PVV is Preferred:**
+- ✅ **More secure**: Cannot be reversed to obtain PIN
+- ✅ **Smaller storage**: 4 digits vs 32+ characters (90% reduction)
+- ✅ **Faster verification**: Simple 4-digit comparison
+- ✅ **Industry standard**: ISO 9564 compliant
+- ✅ **PCI-DSS compliant**: Meets payment card industry standards
+
+### 2.2 Storage Architecture
 
 #### PIN Block Storage di Core Banking System
 ```mermaid
@@ -299,14 +369,15 @@ graph TB
     style K fill:#fff3e0
 ```
 
-#### PIN Block Table Schema
+#### Database Schema for Both Methods
 ```mermaid
 erDiagram
     PIN_BLOCKS ||--o{ ACCOUNTS : "card_id"
     PIN_BLOCKS {
         string pin_block_id PK
         string card_id FK
-        string encrypted_pin_block "Encrypted PIN block data"
+        string encrypted_pin_block "Method A: Encrypted PIN block (32+ hex)"
+        string pvv "Method B: PVV (4 digits) ⭐ Recommended"
         string encryption_key_id "Key used for encryption"
         string format_type "ISO-0/1/2/3"
         datetime creation_date
@@ -325,6 +396,22 @@ erDiagram
         datetime issue_date
         datetime expiry_date
     }
+```
+
+**Storage Examples:**
+
+**Method A (Legacy):**
+```sql
+INSERT INTO pin_blocks (pin_block_id, card_id, encrypted_pin_block, format_type)
+VALUES ('pb001', 'card123', '8F4A2E1D9C7B5A3E6F8D2C4B7A9E5D3C', 'ISO-0');
+```
+
+**Method B (Recommended):**
+```sql
+INSERT INTO pin_blocks (pin_block_id, card_id, pvv, format_type)
+VALUES ('pb001', 'card123', '5672', 'ISO-0');
+-- or simpler, in accounts table:
+INSERT INTO accounts (pan, pvv) VALUES ('4111111111111111', '5672');
 ```
 
 ### 2.2 PIN Mailer Activation Process
@@ -517,11 +604,33 @@ graph LR
 
 ---
 
-## 🔍 3. PIN Block Verification (Single Zone)
+## 🔍 3. PIN Verification Methods
 
-Verifikasi PIN block dalam zona yang sama untuk memvalidasi kebenaran PIN.
+Sistem menyediakan dua metode verifikasi PIN dalam zona yang sama untuk memvalidasi kebenaran PIN.
 
-### 3.1 Verification Process Flow
+### 3.1 Method Comparison
+
+#### Method A: PIN Block Comparison (Educational)
+Membandingkan encrypted PIN block dari terminal dengan yang tersimpan di database.
+
+**Flow:** Terminal → Core Bank → HSM
+- Terminal mengirim PIN block encrypted under TPK
+- Core Bank mengambil PIN block tersimpan (encrypted under LMK)
+- HSM mendekripsi kedua PIN block dan membandingkan
+
+**Cocok untuk:** Educational purposes, demonstrasi
+
+#### Method B: PVV Verification ⭐ Recommended (ISO 9564)
+Membandingkan PVV yang dikalkulasi dengan PVV yang tersimpan.
+
+**Flow:** Terminal → Core Bank → HSM
+- Terminal mengirim PIN block encrypted under TPK
+- Core Bank mengambil PVV yang tersimpan (4 digits, plaintext)
+- HSM mendekripsi PIN block, kalkulasi PVV, bandingkan dengan stored PVV
+
+**Cocok untuk:** Production systems, industry standard
+
+### 3.2 Verification Process Flow
 
 #### Basic Verification Flow
 ```mermaid

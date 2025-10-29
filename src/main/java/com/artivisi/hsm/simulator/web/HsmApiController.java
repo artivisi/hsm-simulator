@@ -36,18 +36,40 @@ public class HsmApiController {
 
     /**
      * POST /api/hsm/pin/encrypt
-     * Encrypt PIN block
+     * Encrypt PIN block with provided cleartext PIN
+     * Returns encrypted PIN block and PVV for storage
      */
     @PostMapping("/pin/encrypt")
     public ResponseEntity<?> encryptPin(@RequestBody PinEncryptRequest request) {
         log.info("API: Encrypting PIN for account {}, format {}", request.getAccountNumber(), request.getFormat());
 
         try {
+            // Validate inputs
+            if (request.getPin() == null || request.getPin().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "PIN is required"
+                ));
+            }
+
+            if (request.getPin().length() < 4 || request.getPin().length() > 12) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "PIN length must be between 4 and 12 digits"
+                ));
+            }
+
+            if (!request.getPin().matches("\\d+")) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "PIN must contain only digits"
+                ));
+            }
+
             UUID keyId = UUID.fromString(request.getKeyId());
+
+            // Use the provided cleartext PIN (not random generation)
             GeneratedPin generatedPin = pinGenerationService.generatePin(
                     keyId,
                     request.getAccountNumber(),
-                    request.getPin().length(),
+                    request.getPin(),  // Use actual PIN from request
                     request.getFormat()
             );
 
@@ -57,9 +79,81 @@ public class HsmApiController {
                     .pvv(generatedPin.getPinVerificationValue())
                     .build();
 
+            log.info("PIN encrypted successfully for account {}, PVV: {}",
+                     request.getAccountNumber(), generatedPin.getPinVerificationValue());
+
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Error encrypting PIN", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * POST /api/hsm/pin/generate-pinblock
+     * Generate PIN block encrypted with LMK
+     * Input: PAN, PIN format, plaintext PIN
+     * Output: Encrypted PIN block, format, PVV
+     */
+    @PostMapping("/pin/generate-pinblock")
+    public ResponseEntity<?> generatePinBlock(@RequestBody Map<String, String> request) {
+        String pan = request.get("pan");
+        String pin = request.get("pin");
+        String format = request.getOrDefault("format", "ISO-0");
+
+        log.info("API: Generating PIN block for PAN {}, format {}", pan, format);
+
+        try {
+            if (pan == null || pan.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "PAN is required"
+                ));
+            }
+
+            if (pin == null || pin.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "PIN is required"
+                ));
+            }
+
+            if (pin.length() < 4 || pin.length() > 12) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "PIN length must be between 4 and 12 digits"
+                ));
+            }
+
+            if (!pin.matches("\\d+")) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "PIN must contain only digits"
+                ));
+            }
+
+            // Find active LMK key
+            MasterKey lmkKey = masterKeyRepository.findByStatus(MasterKey.KeyStatus.ACTIVE)
+                    .stream()
+                    .filter(k -> k.getKeyType() == KeyType.LMK)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No active LMK key found"));
+
+            // Generate PIN block with plaintext PIN
+            GeneratedPin generatedPin = pinGenerationService.generatePin(
+                    lmkKey.getId(),
+                    pan,
+                    pin,
+                    format
+            );
+
+            return ResponseEntity.ok(Map.of(
+                    "encryptedPinBlock", generatedPin.getEncryptedPinBlock(),
+                    "format", generatedPin.getPinFormat(),
+                    "pvv", generatedPin.getPinVerificationValue(),
+                    "keyId", lmkKey.getMasterKeyId(),
+                    "keyType", "LMK"
+            ));
+        } catch (Exception e) {
+            log.error("Error generating PIN block", e);
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));
@@ -86,6 +180,184 @@ public class HsmApiController {
             ));
         } catch (Exception e) {
             log.error("Error verifying PIN", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * POST /api/hsm/pin/verify-with-translation
+     * Verify PIN with TPK to LMK translation
+     * Input: pinBlockUnderLMK, pinBlockUnderTPK, terminalId, pan, pinFormat
+     * This simulates HSM operation where terminal sends PIN block encrypted with TPK,
+     * and HSM translates it to LMK for verification against stored PIN
+     */
+    @PostMapping("/pin/verify-with-translation")
+    public ResponseEntity<?> verifyPinWithTranslation(@RequestBody Map<String, String> request) {
+        String pinBlockUnderLMK = request.get("pinBlockUnderLMK");
+        String pinBlockUnderTPK = request.get("pinBlockUnderTPK");
+        String terminalId = request.get("terminalId");
+        String pan = request.get("pan");
+        String pinFormat = request.getOrDefault("pinFormat", "ISO-0");
+
+        log.info("API: Verifying PIN with translation for terminal {}, PAN {}, format {}",
+                terminalId, pan, pinFormat);
+
+        try {
+            // Validate inputs
+            if (pinBlockUnderLMK == null || pinBlockUnderLMK.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "pinBlockUnderLMK is required"
+                ));
+            }
+
+            if (pinBlockUnderTPK == null || pinBlockUnderTPK.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "pinBlockUnderTPK is required"
+                ));
+            }
+
+            if (terminalId == null || terminalId.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "terminalId is required"
+                ));
+            }
+
+            if (pan == null || pan.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "pan is required"
+                ));
+            }
+
+            // Find active LMK key
+            MasterKey lmkKey = masterKeyRepository.findByStatus(MasterKey.KeyStatus.ACTIVE)
+                    .stream()
+                    .filter(k -> k.getKeyType() == KeyType.LMK)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No active LMK key found"));
+
+            // Find active TPK key for the terminal's bank
+            // For simplicity, we'll use the first active TPK key
+            MasterKey tpkKey = masterKeyRepository.findByStatus(MasterKey.KeyStatus.ACTIVE)
+                    .stream()
+                    .filter(k -> k.getKeyType() == KeyType.TPK)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No active TPK key found"));
+
+            // Verify PIN with translation
+            boolean isValid = pinGenerationService.verifyPinWithTranslation(
+                    pinBlockUnderTPK,
+                    pinBlockUnderLMK,
+                    pan,
+                    pinFormat,
+                    tpkKey.getId(),
+                    lmkKey.getId()
+            );
+
+            return ResponseEntity.ok(Map.of(
+                    "valid", isValid,
+                    "message", isValid ? "PIN verified successfully" : "PIN verification failed",
+                    "terminalId", terminalId,
+                    "pan", pan,
+                    "pinFormat", pinFormat,
+                    "lmkKeyId", lmkKey.getMasterKeyId(),
+                    "tpkKeyId", tpkKey.getMasterKeyId()
+            ));
+        } catch (Exception e) {
+            log.error("Error verifying PIN with translation", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * POST /api/hsm/pin/verify-with-pvv
+     * Verify PIN using PVV (PIN Verification Value) method
+     * Input: pinBlockUnderTPK, storedPVV, terminalId, pan, pinFormat
+     *
+     * This is the most common method in banking (ISO 9564)
+     * Flow:
+     * 1. Terminal → Core Bank: PIN block (TPK) + PAN
+     * 2. Core Bank → Database: Query stored PVV for PAN
+     * 3. Core Bank → HSM: PIN block (TPK) + stored PVV + PAN
+     * 4. HSM: Decrypt PIN block, calculate PVV, compare with stored PVV
+     */
+    @PostMapping("/pin/verify-with-pvv")
+    public ResponseEntity<?> verifyPinWithPVV(@RequestBody Map<String, String> request) {
+        String pinBlockUnderTPK = request.get("pinBlockUnderTPK");
+        String storedPVV = request.get("storedPVV");
+        String terminalId = request.get("terminalId");
+        String pan = request.get("pan");
+        String pinFormat = request.getOrDefault("pinFormat", "ISO-0");
+
+        log.info("API: Verifying PIN with PVV for terminal {}, PAN {}, format {}",
+                terminalId, pan, pinFormat);
+
+        try {
+            // Validate inputs
+            if (pinBlockUnderTPK == null || pinBlockUnderTPK.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "pinBlockUnderTPK is required"
+                ));
+            }
+
+            if (storedPVV == null || storedPVV.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "storedPVV is required"
+                ));
+            }
+
+            if (terminalId == null || terminalId.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "terminalId is required"
+                ));
+            }
+
+            if (pan == null || pan.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "pan is required"
+                ));
+            }
+
+            // Find active TPK key
+            MasterKey tpkKey = masterKeyRepository.findByStatus(MasterKey.KeyStatus.ACTIVE)
+                    .stream()
+                    .filter(k -> k.getKeyType() == KeyType.TPK)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No active TPK key found"));
+
+            // Find active LMK key (used as PVK for PVV calculation)
+            MasterKey pvkKey = masterKeyRepository.findByStatus(MasterKey.KeyStatus.ACTIVE)
+                    .stream()
+                    .filter(k -> k.getKeyType() == KeyType.LMK)
+                    .findFirst()
+                    .orElseThrow(() -> new IllegalStateException("No active LMK key found"));
+
+            // Verify PIN with PVV
+            boolean isValid = pinGenerationService.verifyPinWithPVV(
+                    pinBlockUnderTPK,
+                    storedPVV,
+                    pan,
+                    pinFormat,
+                    tpkKey.getId(),
+                    pvkKey.getId()
+            );
+
+            return ResponseEntity.ok(Map.of(
+                    "valid", isValid,
+                    "message", isValid ? "PIN verified successfully using PVV" : "PIN verification failed - PVV mismatch",
+                    "method", "PVV (PIN Verification Value)",
+                    "terminalId", terminalId,
+                    "pan", pan,
+                    "pinFormat", pinFormat,
+                    "tpkKeyId", tpkKey.getMasterKeyId(),
+                    "pvkKeyId", pvkKey.getMasterKeyId(),
+                    "storedPVV", storedPVV
+            ));
+        } catch (Exception e) {
+            log.error("Error verifying PIN with PVV", e);
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));

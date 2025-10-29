@@ -121,6 +121,75 @@ INSERT INTO users (username, email, password, full_name, role, active) VALUES
 ('admin', 'admin@hsm-simulator.local', '$2a$10$XiLG2cUTyrhavQ0EDwicIOma78/x/bNX/V3PUMNJQuRumgwTLt4dy', 'System Administrator', 'ADMIN', TRUE);
 
 -- ============================================================================
+-- Sample Master Keys
+-- Purpose: Create sample keys for testing PIN operations
+-- ============================================================================
+
+-- Sample LMK (Local Master Key) for PIN encryption
+-- This is a test key for demonstration purposes only
+INSERT INTO master_keys (
+    master_key_id,
+    key_type,
+    algorithm,
+    key_size,
+    key_data_encrypted,
+    key_fingerprint,
+    key_checksum,
+    generation_method,
+    kdf_iterations,
+    kdf_salt,
+    status,
+    generated_at,
+    activated_at
+) VALUES (
+    'LMK-SAMPLE-001',
+    'LMK',
+    'AES',
+    256,
+    decode('0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF', 'hex'),
+    'A1B2C3D4E5F6789012345678',
+    'ABC123',
+    'SAMPLE',
+    100000,
+    'sample_salt_value_12345',
+    'ACTIVE',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+-- Sample TPK (Terminal PIN Key) for terminal PIN encryption
+-- This is a test key for demonstration purposes only
+INSERT INTO master_keys (
+    master_key_id,
+    key_type,
+    algorithm,
+    key_size,
+    key_data_encrypted,
+    key_fingerprint,
+    key_checksum,
+    generation_method,
+    kdf_iterations,
+    kdf_salt,
+    status,
+    generated_at,
+    activated_at
+) VALUES (
+    'TPK-SAMPLE-001',
+    'TPK',
+    'AES',
+    256,
+    decode('FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210FEDCBA9876543210', 'hex'),
+    'F1E2D3C4B5A6987654321098',
+    'FED987',
+    'SAMPLE',
+    100000,
+    'sample_tpk_salt_67890',
+    'ACTIVE',
+    CURRENT_TIMESTAMP,
+    CURRENT_TIMESTAMP
+);
+
+-- ============================================================================
 -- Comments
 -- ============================================================================
 COMMENT ON TABLE banks IS 'Four-party model: Issuer, Acquirer, Switch, and additional Issuer bank';

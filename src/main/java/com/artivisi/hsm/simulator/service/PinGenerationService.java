@@ -131,6 +131,268 @@ public class PinGenerationService {
         return encryptPinBlock(pinBlock, targetKey);
     }
 
+    /**
+     * Verify PIN using encrypted PIN blocks (TPK from terminal, LMK from database)
+     * Method: PIN Block Comparison
+     * This simulates HSM operation where:
+     * 1. Core bank app sends PIN block from terminal (encrypted under TPK)
+     * 2. Core bank app sends stored PIN block from database (encrypted under LMK)
+     * 3. HSM decrypts both and compares the clear PINs directly
+     */
+    @Transactional
+    public boolean verifyPinWithTranslation(
+            String encryptedPinBlockUnderTPK,
+            String encryptedPinBlockUnderLMK,
+            String pan,
+            String pinFormat,
+            UUID tpkKeyId,
+            UUID lmkKeyId) {
+
+        log.info("========================================");
+        log.info("PIN VERIFICATION - METHOD: PIN Block Comparison");
+        log.info("========================================");
+        log.info("Input Parameters:");
+        log.info("  - PAN: {}", maskPan(pan));
+        log.info("  - PIN Format: {}", pinFormat);
+        log.info("  - Encrypted PIN Block (TPK): {}", encryptedPinBlockUnderTPK);
+        log.info("  - Encrypted PIN Block (LMK): {}", encryptedPinBlockUnderLMK);
+
+        try {
+            // Step 1: Retrieve keys
+            log.info("----------------------------------------");
+            log.info("STEP 1: Retrieve Cryptographic Keys");
+            log.info("----------------------------------------");
+
+            MasterKey tpkKey = masterKeyRepository.findById(tpkKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("TPK key not found: " + tpkKeyId));
+            log.info("TPK Key Retrieved:");
+            log.info("  - Key ID: {}", tpkKey.getMasterKeyId());
+            log.info("  - Key Type: {}", tpkKey.getKeyType());
+            log.info("  - Algorithm: {}", tpkKey.getAlgorithm());
+            log.info("  - Key Size: {} bits", tpkKey.getKeySize());
+
+            MasterKey lmkKey = masterKeyRepository.findById(lmkKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("LMK key not found: " + lmkKeyId));
+            log.info("LMK Key Retrieved:");
+            log.info("  - Key ID: {}", lmkKey.getMasterKeyId());
+            log.info("  - Key Type: {}", lmkKey.getKeyType());
+            log.info("  - Algorithm: {}", lmkKey.getAlgorithm());
+            log.info("  - Key Size: {} bits", lmkKey.getKeySize());
+
+            // Validate key types
+            if (tpkKey.getKeyType() != KeyType.TPK) {
+                throw new IllegalArgumentException("Source key must be TPK, got: " + tpkKey.getKeyType());
+            }
+            if (lmkKey.getKeyType() != KeyType.LMK) {
+                throw new IllegalArgumentException("Target key must be LMK, got: " + lmkKey.getKeyType());
+            }
+
+            // Step 2: Decrypt PIN block under TPK
+            log.info("----------------------------------------");
+            log.info("STEP 2: Decrypt PIN Block from Terminal");
+            log.info("----------------------------------------");
+            log.info("Encrypted PIN Block (TPK): {}", encryptedPinBlockUnderTPK);
+            log.info("Decryption Algorithm: AES/ECB");
+
+            String clearPinBlockFromTPK = decryptPinBlock(encryptedPinBlockUnderTPK, tpkKey);
+            log.info("Clear PIN Block (decrypted): {}", clearPinBlockFromTPK);
+
+            // Step 3: Extract PIN from terminal PIN block
+            log.info("----------------------------------------");
+            log.info("STEP 3: Extract PIN from Terminal PIN Block");
+            log.info("----------------------------------------");
+            log.info("PIN Format: {}", pinFormat);
+            log.info("Clear PIN Block: {}", clearPinBlockFromTPK);
+
+            String pinFromTerminal = extractPinFromPinBlock(clearPinBlockFromTPK, pan, pinFormat);
+            log.info("Extracted PIN from Terminal: {}", maskPin(pinFromTerminal));
+            log.info("PIN Length: {}", pinFromTerminal.length());
+
+            // Step 4: Decrypt PIN block under LMK
+            log.info("----------------------------------------");
+            log.info("STEP 4: Decrypt PIN Block from Database");
+            log.info("----------------------------------------");
+            log.info("Encrypted PIN Block (LMK): {}", encryptedPinBlockUnderLMK);
+            log.info("Decryption Algorithm: AES/ECB");
+
+            String clearPinBlockFromLMK = decryptPinBlock(encryptedPinBlockUnderLMK, lmkKey);
+            log.info("Clear PIN Block (decrypted): {}", clearPinBlockFromLMK);
+
+            // Step 5: Extract PIN from database PIN block
+            log.info("----------------------------------------");
+            log.info("STEP 5: Extract PIN from Database PIN Block");
+            log.info("----------------------------------------");
+            log.info("PIN Format: {}", pinFormat);
+            log.info("Clear PIN Block: {}", clearPinBlockFromLMK);
+
+            String pinFromDatabase = extractPinFromPinBlock(clearPinBlockFromLMK, pan, pinFormat);
+            log.info("Extracted PIN from Database: {}", maskPin(pinFromDatabase));
+            log.info("PIN Length: {}", pinFromDatabase.length());
+
+            // Step 6: Compare PINs
+            log.info("----------------------------------------");
+            log.info("STEP 6: Compare Extracted PINs");
+            log.info("----------------------------------------");
+            log.info("Terminal PIN: {}", maskPin(pinFromTerminal));
+            log.info("Database PIN: {}", maskPin(pinFromDatabase));
+
+            boolean isValid = pinFromTerminal.equals(pinFromDatabase);
+
+            log.info("Comparison Result: {}", isValid ? "MATCH" : "MISMATCH");
+            log.info("========================================");
+            log.info("VERIFICATION RESULT: {}", isValid ? "SUCCESS" : "FAILED");
+            log.info("========================================");
+
+            return isValid;
+
+        } catch (Exception e) {
+            log.error("========================================");
+            log.error("VERIFICATION ERROR: {}", e.getMessage());
+            log.error("========================================");
+            throw new RuntimeException("PIN verification failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Verify PIN using PVV (PIN Verification Value) method
+     * Method: PVV Calculation and Comparison
+     * This is the most common method in banking (ISO 9564)
+     *
+     * Flow:
+     * 1. Terminal sends encrypted PIN block (under TPK) + PAN
+     * 2. Core bank app retrieves stored PVV from database
+     * 3. HSM decrypts PIN block to get clear PIN
+     * 4. HSM calculates PVV from clear PIN + PAN using PVK
+     * 5. HSM compares calculated PVV with stored PVV
+     */
+    @Transactional
+    public boolean verifyPinWithPVV(
+            String encryptedPinBlockUnderTPK,
+            String storedPVV,
+            String pan,
+            String pinFormat,
+            UUID tpkKeyId,
+            UUID pvkKeyId) {
+
+        log.info("========================================");
+        log.info("PIN VERIFICATION - METHOD: PVV (PIN Verification Value)");
+        log.info("========================================");
+        log.info("Input Parameters:");
+        log.info("  - PAN: {}", maskPan(pan));
+        log.info("  - PIN Format: {}", pinFormat);
+        log.info("  - Encrypted PIN Block (TPK): {}", encryptedPinBlockUnderTPK);
+        log.info("  - Stored PVV: {}", storedPVV);
+
+        try {
+            // Step 1: Retrieve keys
+            log.info("----------------------------------------");
+            log.info("STEP 1: Retrieve Cryptographic Keys");
+            log.info("----------------------------------------");
+
+            MasterKey tpkKey = masterKeyRepository.findById(tpkKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("TPK key not found: " + tpkKeyId));
+            log.info("TPK Key Retrieved:");
+            log.info("  - Key ID: {}", tpkKey.getMasterKeyId());
+            log.info("  - Key Type: {}", tpkKey.getKeyType());
+            log.info("  - Algorithm: {}", tpkKey.getAlgorithm());
+
+            MasterKey pvkKey = masterKeyRepository.findById(pvkKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("PVK key not found: " + pvkKeyId));
+            log.info("PVK Key Retrieved:");
+            log.info("  - Key ID: {}", pvkKey.getMasterKeyId());
+            log.info("  - Key Type: {}", pvkKey.getKeyType());
+            log.info("  - Algorithm: {}", pvkKey.getAlgorithm());
+
+            // Validate key types
+            if (tpkKey.getKeyType() != KeyType.TPK) {
+                throw new IllegalArgumentException("PIN decryption key must be TPK, got: " + tpkKey.getKeyType());
+            }
+            if (pvkKey.getKeyType() != KeyType.LMK) {
+                throw new IllegalArgumentException("PVV calculation key must be LMK (acting as PVK), got: " + pvkKey.getKeyType());
+            }
+
+            // Step 2: Decrypt PIN block under TPK
+            log.info("----------------------------------------");
+            log.info("STEP 2: Decrypt PIN Block from Terminal");
+            log.info("----------------------------------------");
+            log.info("Encrypted PIN Block (TPK): {}", encryptedPinBlockUnderTPK);
+            log.info("Decryption Algorithm: AES/ECB");
+
+            String clearPinBlock = decryptPinBlock(encryptedPinBlockUnderTPK, tpkKey);
+            log.info("Clear PIN Block (decrypted): {}", clearPinBlock);
+
+            // Step 3: Extract clear PIN
+            log.info("----------------------------------------");
+            log.info("STEP 3: Extract Clear PIN from PIN Block");
+            log.info("----------------------------------------");
+            log.info("PIN Format: {}", pinFormat);
+            log.info("Clear PIN Block: {}", clearPinBlock);
+            log.info("PAN (for XOR): {}", maskPan(pan));
+
+            String clearPin = extractPinFromPinBlock(clearPinBlock, pan, pinFormat);
+            log.info("Extracted Clear PIN: {}", maskPin(clearPin));
+            log.info("PIN Length: {} digits", clearPin.length());
+
+            // Step 4: Calculate PVV from clear PIN
+            log.info("----------------------------------------");
+            log.info("STEP 4: Calculate PVV (PIN Verification Value)");
+            log.info("----------------------------------------");
+            log.info("PVV Calculation Method: SHA-256 based");
+            log.info("Input for PVV calculation:");
+            log.info("  - Clear PIN: {}", maskPin(clearPin));
+            log.info("  - PAN: {}", maskPan(pan));
+            log.info("  - Concatenated: PIN + PAN");
+
+            String calculatedPVV = generatePVV(clearPin, pan);
+            log.info("Calculated PVV: {}", calculatedPVV);
+            log.info("PVV Generation Algorithm:");
+            log.info("  1. Concatenate PIN + PAN");
+            log.info("  2. Apply SHA-256 hash function");
+            log.info("  3. Extract first 4 decimal digits from hash");
+            log.info("  4. Result: {}", calculatedPVV);
+
+            // Step 5: Compare PVVs
+            log.info("----------------------------------------");
+            log.info("STEP 5: Compare Calculated vs Stored PVV");
+            log.info("----------------------------------------");
+            log.info("Stored PVV (from database): {}", storedPVV);
+            log.info("Calculated PVV (from PIN): {}", calculatedPVV);
+
+            boolean isValid = calculatedPVV.equals(storedPVV);
+
+            log.info("Comparison Result: {}", isValid ? "MATCH" : "MISMATCH");
+
+            if (!isValid) {
+                log.warn("PVV Mismatch Details:");
+                log.warn("  - Expected (stored): {}", storedPVV);
+                log.warn("  - Received (calculated): {}", calculatedPVV);
+                log.warn("  - Difference: PVVs do not match");
+            }
+
+            log.info("========================================");
+            log.info("VERIFICATION RESULT: {}", isValid ? "SUCCESS" : "FAILED");
+            log.info("========================================");
+
+            return isValid;
+
+        } catch (Exception e) {
+            log.error("========================================");
+            log.error("VERIFICATION ERROR: {}", e.getMessage());
+            log.error("========================================");
+            throw new RuntimeException("PIN verification with PVV failed: " + e.getMessage(), e);
+        }
+    }
+
+    private String maskPin(String pin) {
+        if (pin == null || pin.length() < 2) return "****";
+        return pin.charAt(0) + "***" + pin.charAt(pin.length() - 1);
+    }
+
+    private String maskPan(String pan) {
+        if (pan == null || pan.length() < 10) return "******";
+        return pan.substring(0, 6) + "******" + pan.substring(pan.length() - 4);
+    }
+
     // ===== Helper Methods =====
 
     private boolean isValidPinKey(MasterKey key) {
@@ -243,6 +505,71 @@ public class PinGenerationService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to encrypt PIN block", e);
         }
+    }
+
+    private String decryptPinBlock(String encryptedPinBlock, MasterKey key) {
+        try {
+            // Use first 16 bytes of key for AES-128
+            byte[] keyBytes = new byte[16];
+            System.arraycopy(key.getKeyDataEncrypted(), 0, keyBytes, 0,
+                           Math.min(16, key.getKeyDataEncrypted().length));
+
+            SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "AES");
+            Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
+            cipher.init(Cipher.DECRYPT_MODE, secretKey);
+
+            // Convert hex encrypted PIN block to bytes
+            byte[] encryptedBytes = hexToBytes(encryptedPinBlock);
+
+            byte[] decrypted = cipher.doFinal(encryptedBytes);
+            return bytesToHex(decrypted);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to decrypt PIN block", e);
+        }
+    }
+
+    private String extractPinFromPinBlock(String clearPinBlock, String pan, String format) {
+        return switch (format) {
+            case "ISO-0" -> extractPinFromISO0(clearPinBlock, pan);
+            case "ISO-1" -> extractPinFromISO1(clearPinBlock);
+            case "ISO-3" -> extractPinFromISO3(clearPinBlock, pan);
+            case "ISO-4" -> extractPinFromISO4(clearPinBlock, pan);
+            default -> throw new IllegalArgumentException("Unsupported PIN format: " + format);
+        };
+    }
+
+    private String extractPinFromISO0(String pinBlock, String pan) {
+        // Reverse XOR operation
+        String panField = "0000" + pan.substring(pan.length() - 13, pan.length() - 1);
+        String pinField = xorHex(pinBlock, panField);
+
+        // Extract length and PIN
+        int pinLength = Character.digit(pinField.charAt(1), 16);
+        return pinField.substring(2, 2 + pinLength);
+    }
+
+    private String extractPinFromISO1(String pinBlock) {
+        // Extract length and PIN (no XOR)
+        int pinLength = Character.digit(pinBlock.charAt(1), 16);
+        return pinBlock.substring(2, 2 + pinLength);
+    }
+
+    private String extractPinFromISO3(String pinBlock, String pan) {
+        // Similar to ISO-0 but with format indicator 3
+        String panField = "0000" + pan.substring(pan.length() - 13, pan.length() - 1);
+        String pinField = xorHex(pinBlock, panField);
+
+        int pinLength = Character.digit(pinField.charAt(1), 16);
+        return pinField.substring(2, 2 + pinLength);
+    }
+
+    private String extractPinFromISO4(String pinBlock, String pan) {
+        // Similar to ISO-0 but with format indicator 4
+        String panField = "0000" + pan.substring(pan.length() - 13, pan.length() - 1);
+        String pinField = xorHex(pinBlock, panField);
+
+        int pinLength = Character.digit(pinField.charAt(1), 16);
+        return pinField.substring(2, 2 + pinLength);
     }
 
     private String generatePVV(String pin, String accountNumber) {

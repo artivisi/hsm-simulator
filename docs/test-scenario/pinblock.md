@@ -493,6 +493,252 @@ Dokumen ini berisi skenario pengujian untuk fitur PIN block generation dan valid
 
 ---
 
+## 6. Skenario REST API Testing
+
+### Test Case 6.1: Generate PIN Block via API
+**ID**: TC-API-001
+**Deskripsi**: Generate PIN block menggunakan REST API endpoint
+**Prasyarat**: HSM Simulator berjalan di `http://localhost:8080`
+
+**Endpoint**: `POST /api/hsm/pin/generate-pinblock`
+
+**Langkah-langkah**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/generate-pinblock \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pan": "4111111111111111",
+    "pin": "1234",
+    "format": "ISO-0"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "encryptedPinBlock": "A1B2C3D4E5F6789012345678901234AB",
+  "format": "ISO-0",
+  "pvv": "5672",
+  "keyId": "LMK-SAMPLE-001",
+  "keyType": "LMK"
+}
+```
+
+**Validasi**:
+- Response status: 200 OK
+- `encryptedPinBlock` berisi 32+ hex characters
+- `pvv` berisi 4 digits
+- `keyId` dan `keyType` sesuai
+
+### Test Case 6.2: PIN Verification Method A (PIN Block Comparison)
+**ID**: TC-API-002
+**Deskripsi**: Verify PIN menggunakan metode perbandingan PIN block
+**Prasyarat**: PIN block sudah di-generate
+
+**Endpoint**: `POST /api/hsm/pin/verify-with-translation`
+
+**Langkah-langkah**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/verify-with-translation \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pinBlockUnderLMK": "A1B2C3D4E5F6789012345678901234AB",
+    "pinBlockUnderTPK": "1234567890ABCDEF1234567890ABCDEF",
+    "terminalId": "TRM-ISS001-ATM-001",
+    "pan": "4111111111111111",
+    "pinFormat": "ISO-0"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "valid": true,
+  "message": "PIN verified successfully",
+  "terminalId": "TRM-ISS001-ATM-001",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0",
+  "lmkKeyId": "LMK-SAMPLE-001",
+  "tpkKeyId": "TPK-SAMPLE-001"
+}
+```
+
+**Validasi**:
+- Response status: 200 OK
+- `valid` field sesuai dengan kondisi PIN
+- Verbose logging muncul di console HSM
+- Message field informatif
+
+### Test Case 6.3: PIN Verification Method B (PVV) ⭐ Recommended
+**ID**: TC-API-003
+**Deskripsi**: Verify PIN menggunakan PVV method (ISO 9564)
+**Prasyarat**: PVV sudah disimpan di database
+
+**Endpoint**: `POST /api/hsm/pin/verify-with-pvv`
+
+**Langkah-langkah**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/verify-with-pvv \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pinBlockUnderTPK": "1234567890ABCDEF1234567890ABCDEF",
+    "storedPVV": "5672",
+    "terminalId": "TRM-ISS001-ATM-001",
+    "pan": "4111111111111111",
+    "pinFormat": "ISO-0"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "valid": true,
+  "message": "PIN verified successfully using PVV",
+  "method": "PVV (PIN Verification Value)",
+  "terminalId": "TRM-ISS001-ATM-001",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0",
+  "tpkKeyId": "TPK-SAMPLE-001",
+  "pvkKeyId": "LMK-SAMPLE-001",
+  "storedPVV": "5672"
+}
+```
+
+**Validasi**:
+- Response status: 200 OK
+- `valid` field sesuai
+- `method` menunjukkan "PVV"
+- Verbose logging menampilkan PVV calculation steps
+
+### Test Case 6.4: Encrypt PIN with Key
+**ID**: TC-API-004
+**Deskripsi**: Encrypt PIN untuk card issuance
+**Prasyarat**: Encryption key (LMK) tersedia
+
+**Endpoint**: `POST /api/hsm/pin/encrypt`
+
+**Langkah-langkah**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/encrypt \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pin": "1234",
+    "accountNumber": "4111111111111111",
+    "format": "ISO-0",
+    "keyId": "YOUR-LMK-KEY-UUID"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "encryptedPinBlock": "8F4A2E1D9C7B5A3E6F8D2C4B7A9E5D3C",
+  "format": "ISO-0",
+  "pvv": "5672"
+}
+```
+
+**Validasi**:
+- Response returns both encrypted PIN block AND PVV
+- PVV is 4 digits
+- Store PVV in database for Method B verification
+
+### Test Case 6.5: API Error Handling
+**ID**: TC-API-005
+**Deskripsi**: Test error responses dari API
+**Prasyarat**: HSM Simulator berjalan
+
+**Test Invalid PIN Length**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/generate-pinblock \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pan": "4111111111111111",
+    "pin": "12",
+    "format": "ISO-0"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "error": "PIN length must be between 4 and 12 digits"
+}
+```
+
+**Test Non-Numeric PIN**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/generate-pinblock \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pan": "4111111111111111",
+    "pin": "12ab",
+    "format": "ISO-0"
+  }'
+```
+
+**Expected Response**:
+```json
+{
+  "error": "PIN must contain only digits"
+}
+```
+
+**Validasi**:
+- Proper HTTP error codes (400)
+- Descriptive error messages
+- Input validation working
+
+### Test Case 6.6: Verbose Logging Verification
+**ID**: TC-API-006
+**Deskripsi**: Verify verbose logging output
+**Prasyarat**: Application logs accessible
+
+**Langkah-langkah**:
+1. Jalankan API call untuk PVV verification
+2. Monitor application console/log output
+3. Verify step-by-step logging muncul:
+   - Key retrieval
+   - PIN block decryption
+   - PIN extraction
+   - PVV calculation (dengan algorithm details)
+   - Comparison result
+
+**Expected Log Output** (example):
+```
+========================================
+PIN VERIFICATION - METHOD: PVV (PIN Verification Value)
+========================================
+Input Parameters:
+  - PAN: 411111******1111
+  - PIN Format: ISO-0
+  - Stored PVV: 5672
+----------------------------------------
+STEP 1: Retrieve Cryptographic Keys
+----------------------------------------
+TPK Key Retrieved:
+  - Key ID: TPK-SAMPLE-001
+  - Algorithm: AES
+...
+========================================
+VERIFICATION RESULT: SUCCESS
+========================================
+```
+
+**Validasi**:
+- All steps logged clearly
+- Intermediate values shown (masked where appropriate)
+- Algorithm details explained
+- Result clearly indicated
+
+---
+
 ## Kesimpulan
 
 Skenario pengujian ini mencakup aspek PIN block generation dan validation untuk HSM Simulator dengan fokus pada:
@@ -501,5 +747,7 @@ Skenario pengujian ini mencakup aspek PIN block generation dan validation untuk 
 2. **Educational Testing**: Step-by-step processes dan interactive learning tools
 3. **Error Handling**: Comprehensive error handling dengan educational messages
 4. **Advanced Features**: Transformasi format dan history tracking
+5. **REST API Testing**: Comprehensive API testing untuk integration dengan external systems
+6. **PVV Method**: Testing untuk industry-standard PVV verification (ISO 9564)
 
 Semua skenario dirancang untuk memberikan pembelajaran yang komprehensif tentang PIN block operations dalam konteks perbankan dan security.

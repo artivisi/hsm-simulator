@@ -16,7 +16,9 @@ The HSM Simulator provides REST API endpoints for cryptographic operations inclu
 
 ### 1. Encrypt PIN
 
-Encrypts a PIN using specified format and encryption key.
+Encrypts a provided cleartext PIN using specified format and encryption key. Returns both the encrypted PIN block and PVV for database storage.
+
+**Use Case**: Card issuance - When issuing a new card, generate PIN block and PVV for storage.
 
 **Endpoint**: `POST /api/hsm/pin/encrypt`
 
@@ -31,7 +33,7 @@ Encrypts a PIN using specified format and encryption key.
 ```
 
 **Request Parameters**:
-- `pin` (string, required): Clear PIN to encrypt (4-12 digits)
+- `pin` (string, required): Cleartext PIN to encrypt (4-12 digits, numeric only)
 - `accountNumber` (string, required): Primary Account Number (PAN) 12-19 digits
 - `format` (string, required): PIN block format - `ISO-0`, `ISO-1`, `ISO-3`, or `ISO-4`
 - `keyId` (string, required): UUID of encryption key (LMK, TPK, or ZPK)
@@ -39,16 +41,20 @@ Encrypts a PIN using specified format and encryption key.
 **Response**:
 ```json
 {
-  "encryptedPinBlock": "A1B2C3D4E5F6G7H8",
+  "encryptedPinBlock": "A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6",
   "format": "ISO-0",
   "pvv": "1234"
 }
 ```
 
 **Response Fields**:
-- `encryptedPinBlock` (string): Hex-encoded encrypted PIN block
+- `encryptedPinBlock` (string): Hex-encoded encrypted PIN block (for storage in database)
 - `format` (string): PIN block format used
-- `pvv` (string): PIN Verification Value (4 digits)
+- `pvv` (string): **PIN Verification Value (4 digits)** - Store this in database for PVV-based verification
+
+**What to Store in Database**:
+- **For Method A (PIN Block Comparison)**: Store `encryptedPinBlock` (encrypted under LMK)
+- **For Method B (PVV) ⭐ Recommended**: Store `pvv` (plaintext, 4 digits)
 
 **PIN Formats**:
 - **ISO-0** (ANSI X9.8): `0L[PIN][F...] XOR [0000][12 PAN digits]`
@@ -60,7 +66,7 @@ Encrypts a PIN using specified format and encryption key.
 ```bash
 curl -X POST http://localhost:8080/api/hsm/pin/encrypt \
   -H "Content-Type: application/json" \
-  -u user:password \
+  -u admin:admin \
   -d '{
     "pin": "1234",
     "accountNumber": "4111111111111111",
@@ -69,7 +75,36 @@ curl -X POST http://localhost:8080/api/hsm/pin/encrypt \
   }'
 ```
 
-**Error Response**:
+**Success Response Example**:
+```json
+{
+  "encryptedPinBlock": "8F4A2E1D9C7B5A3E6F8D2C4B7A9E5D3C",
+  "format": "ISO-0",
+  "pvv": "1234"
+}
+```
+
+**Database Storage Example**:
+```sql
+-- For Method B (PVV) - Recommended
+INSERT INTO accounts (pan, pvv) VALUES ('4111111111111111', '1234');
+
+-- For Method A (PIN Block Comparison)
+INSERT INTO generated_pins (account_number, encrypted_pin_block, encryption_key_id)
+VALUES ('4111111111111111', '8F4A2E1D9C7B5A3E6F8D2C4B7A9E5D3C', 'key-uuid');
+```
+
+**Error Responses**:
+```json
+{
+  "error": "PIN length must be between 4 and 12 digits"
+}
+```
+```json
+{
+  "error": "PIN must contain only digits"
+}
+```
 ```json
 {
   "error": "Invalid key type for PIN encryption. Use LMK (storage), TPK (terminal), or ZPK (zone)."
@@ -121,9 +156,269 @@ curl -X POST http://localhost:8080/api/hsm/pin/verify \
 
 ---
 
+### 3. Generate PIN Block
+
+Generates encrypted PIN block under LMK from plaintext PIN.
+
+**Endpoint**: `POST /api/hsm/pin/generate-pinblock`
+
+**Request Body**:
+```json
+{
+  "pan": "4111111111111111",
+  "pin": "1234",
+  "format": "ISO-0"
+}
+```
+
+**Request Parameters**:
+- `pan` (string, required): Primary Account Number (PAN) 12-19 digits
+- `pin` (string, required): Plaintext PIN (4-12 digits)
+- `format` (string, optional): PIN block format - `ISO-0`, `ISO-1`, `ISO-3`, or `ISO-4`, defaults to `ISO-0`
+
+**Response**:
+```json
+{
+  "encryptedPinBlock": "A1B2C3D4E5F6789012345678901234AB",
+  "format": "ISO-0",
+  "pvv": "1234",
+  "keyId": "LMK-SAMPLE-001",
+  "keyType": "LMK"
+}
+```
+
+**Response Fields**:
+- `encryptedPinBlock` (string): PIN block encrypted under LMK (hex-encoded)
+- `format` (string): PIN block format used
+- `pvv` (string): PIN Verification Value (4 digits)
+- `keyId` (string): LMK key identifier used
+- `keyType` (string): Always "LMK"
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/generate-pinblock \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pan": "4111111111111111",
+    "pin": "1234",
+    "format": "ISO-0"
+  }'
+```
+
+**Error Response**:
+```json
+{
+  "error": "PIN length must be between 4 and 12 digits"
+}
+```
+
+---
+
+### 4. Verify PIN with Translation (Method A)
+
+Verifies PIN by comparing encrypted PIN blocks from terminal and database. This method demonstrates the complete HSM flow where both encrypted PIN blocks are provided.
+
+**Architecture**: Terminal → Core Bank App → HSM
+
+**Endpoint**: `POST /api/hsm/pin/verify-with-translation`
+
+**Request Body**:
+```json
+{
+  "pinBlockUnderLMK": "A1B2C3D4E5F6789012345678901234AB",
+  "pinBlockUnderTPK": "1234567890ABCDEF1234567890ABCDEF",
+  "terminalId": "TRM-ISS001-ATM-001",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0"
+}
+```
+
+**Request Parameters**:
+- `pinBlockUnderLMK` (string, required): Encrypted PIN block from database (under LMK)
+- `pinBlockUnderTPK` (string, required): Encrypted PIN block from terminal (under TPK)
+- `terminalId` (string, required): Terminal identifier
+- `pan` (string, required): Primary Account Number
+- `pinFormat` (string, optional): PIN block format, defaults to `ISO-0`
+
+**Flow**:
+1. **Terminal → Core Bank**: Sends PIN block (TPK) + PAN
+2. **Core Bank → Database**: Queries stored PIN block (LMK)
+3. **Core Bank → HSM**: Sends both PIN blocks + PAN + Terminal ID
+4. **HSM Processing**:
+   - Decrypts PIN block under TPK → extracts PIN
+   - Decrypts PIN block under LMK → extracts PIN
+   - Compares both clear PINs
+
+**Response**:
+```json
+{
+  "valid": true,
+  "message": "PIN verified successfully",
+  "terminalId": "TRM-ISS001-ATM-001",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0",
+  "lmkKeyId": "LMK-SAMPLE-001",
+  "tpkKeyId": "TPK-SAMPLE-001"
+}
+```
+
+**Response Fields**:
+- `valid` (boolean): True if PINs match, false otherwise
+- `message` (string): Verification result message
+- `terminalId` (string): Echo of terminal identifier
+- `pan` (string): Echo of PAN
+- `pinFormat` (string): Echo of PIN format used
+- `lmkKeyId` (string): LMK key identifier used
+- `tpkKeyId` (string): TPK key identifier used
+
+**Verbose Logging**: This method produces detailed step-by-step logs showing:
+- Key retrieval (TPK, LMK)
+- Decryption of both PIN blocks
+- PIN extraction process
+- Final comparison result
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/verify-with-translation \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pinBlockUnderLMK": "A1B2C3D4E5F6789012345678901234AB",
+    "pinBlockUnderTPK": "1234567890ABCDEF1234567890ABCDEF",
+    "terminalId": "TRM-ISS001-ATM-001",
+    "pan": "4111111111111111",
+    "pinFormat": "ISO-0"
+  }'
+```
+
+---
+
+### 5. Verify PIN with PVV (Method B) ⭐ RECOMMENDED
+
+Verifies PIN using PVV (PIN Verification Value) method. This is the most common method in banking systems (ISO 9564 compliant) and offers better security than Method A.
+
+**Architecture**: Terminal → Core Bank App → HSM
+
+**Endpoint**: `POST /api/hsm/pin/verify-with-pvv`
+
+**Request Body**:
+```json
+{
+  "pinBlockUnderTPK": "1234567890ABCDEF1234567890ABCDEF",
+  "storedPVV": "1234",
+  "terminalId": "TRM-ISS001-ATM-001",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0"
+}
+```
+
+**Request Parameters**:
+- `pinBlockUnderTPK` (string, required): Encrypted PIN block from terminal (under TPK)
+- `storedPVV` (string, required): Stored PVV from database (4 digits)
+- `terminalId` (string, required): Terminal identifier
+- `pan` (string, required): Primary Account Number
+- `pinFormat` (string, optional): PIN block format, defaults to `ISO-0`
+
+**Flow**:
+1. **Terminal → Core Bank**: Sends PIN block (TPK) + PAN
+2. **Core Bank → Database**: Queries stored PVV (4 digits)
+3. **Core Bank → HSM**: Sends PIN block (TPK) + stored PVV + PAN
+4. **HSM Processing**:
+   - Decrypts PIN block under TPK → extracts clear PIN
+   - Calculates PVV from clear PIN + PAN using SHA-256
+   - Compares calculated PVV with stored PVV
+
+**PVV Calculation Method**:
+```
+Input: PIN (1234) + PAN (4111111111111111)
+Process: SHA-256(PIN + PAN)
+Extract: First 4 decimal digits from hash
+Output: PVV (e.g., "1234")
+```
+
+**Why PVV is Preferred**:
+- ✅ **More secure**: PVV is one-way, cannot be reversed to PIN
+- ✅ **Smaller storage**: 4 digits vs 32+ character encrypted PIN block
+- ✅ **Industry standard**: ISO 9564 compliant
+- ✅ **Production ready**: Used by major banks worldwide
+
+**Response**:
+```json
+{
+  "valid": true,
+  "message": "PIN verified successfully using PVV",
+  "method": "PVV (PIN Verification Value)",
+  "terminalId": "TRM-ISS001-ATM-001",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0",
+  "tpkKeyId": "TPK-SAMPLE-001",
+  "pvkKeyId": "LMK-SAMPLE-001",
+  "storedPVV": "1234"
+}
+```
+
+**Response Fields**:
+- `valid` (boolean): True if PVV matches, false otherwise
+- `message` (string): Verification result message
+- `method` (string): Verification method used
+- `terminalId` (string): Echo of terminal identifier
+- `pan` (string): Echo of PAN
+- `pinFormat` (string): Echo of PIN format used
+- `tpkKeyId` (string): TPK key identifier for PIN decryption
+- `pvkKeyId` (string): PVK key identifier for PVV calculation (uses LMK)
+- `storedPVV` (string): Echo of stored PVV
+
+**Verbose Logging**: This method produces detailed step-by-step logs showing:
+- Key retrieval (TPK, PVK)
+- PIN block decryption
+- PIN extraction
+- PVV calculation process (with algorithm details)
+- Final comparison result
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/verify-with-pvv \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{
+    "pinBlockUnderTPK": "1234567890ABCDEF1234567890ABCDEF",
+    "storedPVV": "1234",
+    "terminalId": "TRM-ISS001-ATM-001",
+    "pan": "4111111111111111",
+    "pinFormat": "ISO-0"
+  }'
+```
+
+**Error Response**:
+```json
+{
+  "error": "PIN verification with PVV failed: No active TPK key found"
+}
+```
+
+---
+
+## PIN Verification Methods Comparison
+
+| Aspect | Method A: PIN Block Comparison | Method B: PVV ⭐ |
+|--------|-------------------------------|-----------------|
+| **Endpoint** | `/pin/verify-with-translation` | `/pin/verify-with-pvv` |
+| **Storage** | Full encrypted PIN block (32+ chars) | 4-digit PVV |
+| **Security** | Reversible with key | One-way function |
+| **Industry Usage** | Educational/legacy systems | **Most common** (ISO 9564) |
+| **Database Size** | Larger | **Smaller** |
+| **HSM Operations** | 2 decryptions + compare | 1 decryption + PVV calc |
+| **Compliance** | N/A | **ISO 9564** |
+| **Best For** | Demonstration, teaching | **Production systems** |
+
+**Recommendation**: Use **Method B (PVV)** for production systems. Method A is included for educational purposes to demonstrate alternative PIN verification approaches.
+
+---
+
 ## MAC Operations
 
-### 3. Generate MAC
+### 6. Generate MAC
 
 Generates Message Authentication Code for message integrity.
 
@@ -176,7 +471,7 @@ curl -X POST http://localhost:8080/api/hsm/mac/generate \
 
 ---
 
-### 4. Verify MAC
+### 7. Verify MAC
 
 Verifies MAC authenticity for received message.
 
@@ -227,7 +522,7 @@ curl -X POST http://localhost:8080/api/hsm/mac/verify \
 
 ## Key Management
 
-### 5. Generate Key
+### 8. Generate Key
 
 Generates new cryptographic key (ZMK or TMK).
 
@@ -287,7 +582,7 @@ curl -X POST http://localhost:8080/api/hsm/key/generate \
 
 ---
 
-### 6. Exchange Key
+### 9. Exchange Key
 
 Exchanges cryptographic key between encryption domains.
 
@@ -463,7 +758,25 @@ String kcv = response.getKeyCheckValue();
 ### Using cURL
 
 ```bash
-# Generate PIN
+# Generate PIN Block under LMK
+curl -X POST http://localhost:8080/api/hsm/pin/generate-pinblock \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{"pan":"4111111111111111","pin":"1234","format":"ISO-0"}'
+
+# Verify PIN - Method A (PIN Block Comparison)
+curl -X POST http://localhost:8080/api/hsm/pin/verify-with-translation \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{"pinBlockUnderLMK":"YOUR-LMK-PINBLOCK","pinBlockUnderTPK":"YOUR-TPK-PINBLOCK","terminalId":"TRM-001","pan":"4111111111111111","pinFormat":"ISO-0"}'
+
+# Verify PIN - Method B (PVV) ⭐ Recommended
+curl -X POST http://localhost:8080/api/hsm/pin/verify-with-pvv \
+  -H "Content-Type: application/json" \
+  -u admin:admin \
+  -d '{"pinBlockUnderTPK":"YOUR-TPK-PINBLOCK","storedPVV":"1234","terminalId":"TRM-001","pan":"4111111111111111","pinFormat":"ISO-0"}'
+
+# Encrypt PIN (Legacy)
 curl -X POST http://localhost:8080/api/hsm/pin/encrypt \
   -H "Content-Type: application/json" \
   -u admin:admin \
@@ -518,4 +831,4 @@ For issues or questions:
 
 ---
 
-**Last Updated**: October 26, 2025
+**Last Updated**: October 29, 2025
