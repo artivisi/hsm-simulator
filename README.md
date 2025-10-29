@@ -47,6 +47,8 @@ Dokumentasi lengkap REST API untuk integrasi workshop dan external systems terse
 - `POST /api/hsm/pin/verify-with-translation` - Verify PIN using PIN block comparison (Method A)
 - `POST /api/hsm/pin/verify-with-pvv` - Verify PIN using PVV method (Method B) ⭐ ISO 9564
 - `POST /api/hsm/pin/verify` - Verify PIN against stored value (legacy)
+- `POST /api/hsm/pin/translate/tpk-to-zpk` - ⭐ Translate PIN block from TPK to ZPK (acquirer side)
+- `POST /api/hsm/pin/translate/zpk-to-lmk` - ⭐ Translate PIN block from ZPK to LMK (issuer side)
 - `POST /api/hsm/mac/generate` - Generate MAC (ISO9797-ALG3, HMAC-SHA256, CBC-MAC)
 - `POST /api/hsm/mac/verify` - Verify MAC authenticity
 - `POST /api/hsm/keys/initialize` - ⚡ Initialize complete key set for all banks (quick HSM setup)
@@ -191,7 +193,7 @@ sequenceDiagram
 
     Note over C,BB_HSM: Transaction Flow with Key Management
     Note over AB,AB_HSM: Acquirer: Validate & PIN Translation (TPK→ZPK)
-    Note over IB,IB_HSM: Issuer: PIN Translation (ZPK→TPK) & Verify
+    Note over IB,IB_HSM: Issuer: PIN Translation (ZPK→LMK) & Verify
 
     C->>T: Insert Card & Enter PIN
     T->>T: Generate PIN Block (ISO format)
@@ -206,8 +208,8 @@ sequenceDiagram
     NW->>IB: Forward transaction
     IB->>IB_HSM: Verify encrypted PIN Block
     Note over IB,IB_HSM: Authorization Process
-    IB_HSM->>IB_HSM: PIN Translation: ZPK → TPK
-    IB_HSM->>IB_HSM: Decrypt PIN Block with TPK
+    IB_HSM->>IB_HSM: PIN Translation: ZPK → LMK
+    IB_HSM->>IB_HSM: Decrypt PIN Block with LMK
     IB_HSM->>IB_HSM: Verify PIN against customer data
     IB_HSM->>IB: Return verification result (approve/reject)
     IB->>NW: Authorization response
@@ -257,9 +259,9 @@ Arsitektur ini menggambarkan ekosistem perbankan lengkap dengan tiga pihak utama
 
 1. **PIN Management**:
    - PIN generation dan verification
-   - PIN block format (ISO-0, ISO-1, ISO-3)
+   - PIN block format (ISO-0, ISO-1, ISO-3, ISO-4)
    - PIN translation antar format
-   - PIN translation antar kunci (TPK↔ZPK)
+   - PIN translation antar kunci (TPK→ZPK, ZPK→LMK) untuk inter-bank transactions
 
 2. **Key Management**:
    - Key generation (TMK, TSK, ZMK, ZPK)
@@ -345,7 +347,7 @@ HSM Simulator mendukung berbagai jenis kunci kriptografi untuk operasi perbankan
 ### Alur Keamanan Transaksi
 
 1. **PIN Entry**: PIN dikonversi menjadi PIN Block di terminal, kemudian dienkripsi dengan TPK di dalam terminal
-2. **Authorization**: Acquirer memvalidasi integritas, melakukan PIN Translation (TPK→ZPK), dan meneruskan ke issuer. Issuer melakukan PIN Translation (ZPK→TPK), mendekripsi, dan memverifikasi PIN
+2. **Authorization**: Acquirer memvalidasi integritas, melakukan PIN Translation (TPK→ZPK), dan meneruskan ke issuer. Issuer melakukan PIN Translation (ZPK→LMK), mendekripsi, dan memverifikasi PIN
 3. **Key Exchange**: ZPK dan ZSK didistribusikan antar bank dengan enkripsi ZMK
 4. **Inter-bank PIN Data**: PIN-related data antar bank dienkripsi dengan ZPK
 5. **Inter-bank Transaction Data**: Data transaksi antar bank dienkripsi dengan ZSK
@@ -355,7 +357,7 @@ HSM Simulator mendukung berbagai jenis kunci kriptografi untuk operasi perbankan
 9. **Key Hierarchy**: TMK mengamankan TPK/TSK, ZMK mengamankan ZPK/ZSK
 10. **Acquirer Role**: HSM acquirer hanya memvalidasi integritas, tidak pernah mendekripsi PIN Block
 11. **Issuer Role**: HSM issuer satu-satunya pihak yang mendekripsi dan memverifikasi PIN
-12. **PIN Translation**: Konversi PIN Block antar kunci (TPK↔ZPK) untuk komunikasi inter-bank
+12. **PIN Translation**: Konversi PIN Block antar kunci (TPK→ZPK untuk acquirer, ZPK→LMK untuk issuer) untuk komunikasi inter-bank
 
 Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan dengan memanfaatkan HSM untuk semua operasi kriptografi kritis.
 
@@ -376,6 +378,7 @@ Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan de
 - ✅ **PIN Encryption** - Support for ISO-0, ISO-1, ISO-3, ISO-4 formats (ISO 9564-1:2002)
 - ✅ **PIN Verification** - With failed attempt tracking and auto-blocking after 3 failures
 - ✅ **PIN Translation** - Re-encrypt PIN from one key to another with educational visualization
+- ✅ **Zone PIN Translation** - TPK→ZPK (acquirer) and ZPK→LMK (issuer) for inter-bank transactions
 - ✅ **PVV Generation** - PIN Verification Value for offline validation
 
 #### MAC Operations
@@ -387,10 +390,12 @@ Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan de
 #### REST API for Integration
 - ✅ **PIN Encrypt API** - `/api/hsm/pin/encrypt` with all ISO formats
 - ✅ **PIN Verify API** - `/api/hsm/pin/verify` with status tracking
+- ✅ **PIN Translation API** - `/api/hsm/pin/translate/tpk-to-zpk` and `/api/hsm/pin/translate/zpk-to-lmk` for inter-bank flows
 - ✅ **MAC Generate API** - `/api/hsm/mac/generate` with 3 algorithms
 - ✅ **MAC Verify API** - `/api/hsm/mac/verify` with tamper detection
 - ✅ **Key Generate API** - `/api/hsm/key/generate` for ZMK and TMK
 - ✅ **Key Exchange API** - `/api/hsm/key/exchange` with KCV calculation
+- ✅ **Key Initialize API** - `/api/hsm/keys/initialize` for complete bank key setup
 
 #### Banking Infrastructure
 - ✅ **Four-Party Model** - Banks (ISSUER, ACQUIRER, SWITCH, PROCESSOR)
