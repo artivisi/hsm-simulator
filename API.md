@@ -416,6 +416,241 @@ curl -X POST http://localhost:8080/api/hsm/pin/verify-with-pvv \
 
 ---
 
+## Zone PIN Translation
+
+### 6. Translate PIN Block: TPK → ZPK (Acquirer Side)
+
+Translates PIN block from Terminal PIN Key (TPK) to Zone PIN Key (ZPK) for inter-bank transmission.
+
+**Use Case**: Acquirer receives PIN encrypted under TPK from terminal, then re-encrypts under ZPK to forward to issuer for authorization.
+
+**Endpoint**: `POST /api/hsm/pin/translate/tpk-to-zpk`
+
+**Request Body**:
+```json
+{
+  "pinBlockUnderTPK": "1A2B3C4D5E6F7890A1B2C3D4E5F67890",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0",
+  "tpkKeyId": "uuid-of-tpk-key",
+  "zpkKeyId": "uuid-of-zpk-key"
+}
+```
+
+**Request Parameters**:
+- `pinBlockUnderTPK` (string, required): PIN block encrypted under TPK (hex format, 32 characters)
+- `pan` (string, required): Primary Account Number (10-19 digits)
+- `pinFormat` (string, required): PIN block format - `ISO-0`, `ISO-1`, `ISO-3`, or `ISO-4`
+- `tpkKeyId` (string, required): UUID of Terminal PIN Key (must be KeyType.TPK)
+- `zpkKeyId` (string, required): UUID of Zone PIN Key (must be KeyType.ZPK)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "PIN block translated from TPK to ZPK successfully",
+  "pinBlockUnderZPK": "9F8E7D6C5B4A39281F0E1D2C3B4A5968",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0",
+  "tpkKeyId": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+  "zpkKeyId": "f6e5d4c3-b2a1-9807-f6e5-d4c3b2a19807"
+}
+```
+
+**Response Fields**:
+- `success` (boolean): Operation success status
+- `message` (string): Success message
+- `pinBlockUnderZPK` (string): PIN block encrypted under ZPK (hex format, 32 characters)
+- `pan` (string): Primary Account Number (echoed)
+- `pinFormat` (string): PIN block format (echoed)
+- `tpkKeyId` (string): TPK key UUID (echoed)
+- `zpkKeyId` (string): ZPK key UUID (echoed)
+
+**Transaction Flow**:
+```
+1. Terminal → Acquirer: PIN Block under TPK
+2. Acquirer HSM: Decrypt TPK → Extract PIN → Re-encrypt ZPK
+3. Acquirer → Issuer: PIN Block under ZPK (for authorization)
+```
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/translate/tpk-to-zpk \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pinBlockUnderTPK": "1A2B3C4D5E6F7890A1B2C3D4E5F67890",
+    "pan": "4111111111111111",
+    "pinFormat": "ISO-0",
+    "tpkKeyId": "a1b2c3d4-e5f6-7890-a1b2-c3d4e5f67890",
+    "zpkKeyId": "f6e5d4c3-b2a1-9807-f6e5-d4c3b2a19807"
+  }'
+```
+
+**Verbose Logging**: This endpoint produces detailed step-by-step logs:
+```
+========================================
+PIN TRANSLATION: TPK → ZPK (Acquirer)
+========================================
+PAN: 411111******1111
+PIN Format: ISO-0
+TPK Key: TPK-TRM-ACQ001-ATM-001-ABC123 (TPK)
+ZPK Key: ZPK-ACQ001-SHARED-DEF456 (ZPK)
+Step 1: Decrypting PIN block under TPK
+Clear PIN block: 041234FFFFFFFFFF
+Step 2: Extracting PIN from clear PIN block
+Extracted PIN: 1***4
+Step 3: Creating PIN block for ZPK encryption
+New PIN block: 041234FFFFFFFFFF
+Step 4: Encrypting PIN block under ZPK
+Encrypted PIN block under ZPK: 9F8E7D6C5B4A39281F0E1D2C3B4A5968
+========================================
+TRANSLATION COMPLETE: TPK → ZPK
+========================================
+```
+
+---
+
+### 7. Translate PIN Block: ZPK → LMK (Issuer Side)
+
+Translates PIN block from Zone PIN Key (ZPK) to Local Master Key (LMK) for verification.
+
+**Use Case**: Issuer receives PIN encrypted under ZPK from acquirer, then re-encrypts under LMK to verify against stored PIN.
+
+**Endpoint**: `POST /api/hsm/pin/translate/zpk-to-lmk`
+
+**Request Body**:
+```json
+{
+  "pinBlockUnderZPK": "9F8E7D6C5B4A39281F0E1D2C3B4A5968",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0",
+  "zpkKeyId": "uuid-of-zpk-key",
+  "lmkKeyId": "uuid-of-lmk-key"
+}
+```
+
+**Request Parameters**:
+- `pinBlockUnderZPK` (string, required): PIN block encrypted under ZPK (hex format, 32 characters)
+- `pan` (string, required): Primary Account Number (10-19 digits)
+- `pinFormat` (string, required): PIN block format - `ISO-0`, `ISO-1`, `ISO-3`, or `ISO-4`
+- `zpkKeyId` (string, required): UUID of Zone PIN Key (must be KeyType.ZPK)
+- `lmkKeyId` (string, required): UUID of Local Master Key (must be KeyType.LMK)
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "PIN block translated from ZPK to LMK successfully",
+  "pinBlockUnderLMK": "5A4B3C2D1E0F98765A4B3C2D1E0F9876",
+  "pan": "4111111111111111",
+  "pinFormat": "ISO-0",
+  "zpkKeyId": "f6e5d4c3-b2a1-9807-f6e5-d4c3b2a19807",
+  "lmkKeyId": "1f2e3d4c-5b6a-7980-1f2e-3d4c5b6a7980"
+}
+```
+
+**Response Fields**:
+- `success` (boolean): Operation success status
+- `message` (string): Success message
+- `pinBlockUnderLMK` (string): PIN block encrypted under LMK (hex format, 32 characters)
+- `pan` (string): Primary Account Number (echoed)
+- `pinFormat` (string): PIN block format (echoed)
+- `zpkKeyId` (string): ZPK key UUID (echoed)
+- `lmkKeyId` (string): LMK key UUID (echoed)
+
+**Transaction Flow**:
+```
+1. Acquirer → Issuer: PIN Block under ZPK
+2. Issuer HSM: Decrypt ZPK → Extract PIN → Re-encrypt LMK
+3. Issuer: Compare with stored PIN Block under LMK (verification)
+```
+
+**Example**:
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/translate/zpk-to-lmk \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pinBlockUnderZPK": "9F8E7D6C5B4A39281F0E1D2C3B4A5968",
+    "pan": "4111111111111111",
+    "pinFormat": "ISO-0",
+    "zpkKeyId": "f6e5d4c3-b2a1-9807-f6e5-d4c3b2a19807",
+    "lmkKeyId": "1f2e3d4c-5b6a-7980-1f2e-3d4c5b6a7980"
+  }'
+```
+
+**Verbose Logging**: This endpoint produces detailed step-by-step logs:
+```
+========================================
+PIN TRANSLATION: ZPK → LMK (Issuer)
+========================================
+PAN: 411111******1111
+PIN Format: ISO-0
+ZPK Key: ZPK-ISS001-GHI789 (ZPK)
+LMK Key: LMK-ISS001-JKL012 (LMK)
+Step 1: Decrypting PIN block under ZPK
+Clear PIN block: 041234FFFFFFFFFF
+Step 2: Extracting PIN from clear PIN block
+Extracted PIN: 1***4
+Step 3: Creating PIN block for LMK encryption
+New PIN block: 041234FFFFFFFFFF
+Step 4: Encrypting PIN block under LMK
+Encrypted PIN block under LMK: 5A4B3C2D1E0F98765A4B3C2D1E0F9876
+========================================
+TRANSLATION COMPLETE: ZPK → LMK
+========================================
+```
+
+**Complete Inter-Bank Transaction Example**:
+```bash
+# Scenario: Cardholder uses ISS001 card at ACQ001 ATM
+
+# 1. Terminal encrypts PIN with TPK
+# (Happens automatically at ATM)
+
+# 2. Acquirer translates TPK → ZPK
+curl -X POST http://acquirer-hsm:8080/api/hsm/pin/translate/tpk-to-zpk \
+  -d '{
+    "pinBlockUnderTPK": "1A2B3C...",
+    "pan": "4111111111111111",
+    "pinFormat": "ISO-0",
+    "tpkKeyId": "tpk-acq001-atm-uuid",
+    "zpkKeyId": "zpk-acq001-shared-uuid"
+  }'
+# Returns: {"pinBlockUnderZPK": "9F8E7D..."}
+
+# 3. Acquirer forwards to Issuer (via network)
+# (Application layer - not HSM)
+
+# 4. Issuer translates ZPK → LMK
+curl -X POST http://issuer-hsm:8080/api/hsm/pin/translate/zpk-to-lmk \
+  -d '{
+    "pinBlockUnderZPK": "9F8E7D...",
+    "pan": "4111111111111111",
+    "pinFormat": "ISO-0",
+    "zpkKeyId": "zpk-iss001-uuid",
+    "lmkKeyId": "lmk-iss001-uuid"
+  }'
+# Returns: {"pinBlockUnderLMK": "5A4B3C..."}
+
+# 5. Issuer verifies against database
+# (Compare with stored PIN block under LMK)
+```
+
+**Error Responses**:
+```json
+{
+  "error": "Source key must be TPK, got: TMK"
+}
+```
+
+```json
+{
+  "error": "Missing required parameters: pinBlockUnderTPK, pan, pinFormat, tpkKeyId, zpkKeyId"
+}
+```
+
+---
+
 ## MAC Operations
 
 ### 6. Generate MAC

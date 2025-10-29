@@ -367,6 +367,138 @@ public class HsmApiController {
     }
 
     /**
+     * POST /api/hsm/pin/translate/tpk-to-zpk
+     * Translate PIN block from TPK to ZPK (Acquirer side: Terminal to Zone)
+     *
+     * Used by acquirer when forwarding cardholder PIN to issuer for inter-bank transaction.
+     * The acquirer receives PIN encrypted under TPK from the terminal, then re-encrypts
+     * under ZPK for transmission to the issuer.
+     *
+     * Flow:
+     * 1. Terminal encrypts PIN with TPK → sends to Acquirer
+     * 2. Acquirer calls this endpoint → translates TPK to ZPK
+     * 3. Acquirer sends ZPK-encrypted PIN to Issuer
+     *
+     * Request body:
+     * {
+     *   "pinBlockUnderTPK": "encrypted_hex_string",
+     *   "pan": "4111111111111111",
+     *   "pinFormat": "ISO-0",
+     *   "tpkKeyId": "uuid-of-tpk-key",
+     *   "zpkKeyId": "uuid-of-zpk-key"
+     * }
+     */
+    @PostMapping("/pin/translate/tpk-to-zpk")
+    public ResponseEntity<?> translateTpkToZpk(@RequestBody Map<String, String> request) {
+        String pinBlockUnderTPK = request.get("pinBlockUnderTPK");
+        String pan = request.get("pan");
+        String pinFormat = request.get("pinFormat");
+        String tpkKeyId = request.get("tpkKeyId");
+        String zpkKeyId = request.get("zpkKeyId");
+
+        log.info("API: Translating PIN block TPK → ZPK for PAN {}, format {}", pan, pinFormat);
+
+        try {
+            // Validate input
+            if (pinBlockUnderTPK == null || pan == null || pinFormat == null || tpkKeyId == null || zpkKeyId == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Missing required parameters: pinBlockUnderTPK, pan, pinFormat, tpkKeyId, zpkKeyId"
+                ));
+            }
+
+            // Translate PIN block
+            String pinBlockUnderZPK = pinGenerationService.translateTpkToZpk(
+                    pinBlockUnderTPK,
+                    pan,
+                    pinFormat,
+                    UUID.fromString(tpkKeyId),
+                    UUID.fromString(zpkKeyId)
+            );
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "PIN block translated from TPK to ZPK successfully",
+                    "pinBlockUnderZPK", pinBlockUnderZPK,
+                    "pan", pan,
+                    "pinFormat", pinFormat,
+                    "tpkKeyId", tpkKeyId,
+                    "zpkKeyId", zpkKeyId
+            ));
+        } catch (Exception e) {
+            log.error("Error translating PIN block TPK → ZPK", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
+     * POST /api/hsm/pin/translate/zpk-to-lmk
+     * Translate PIN block from ZPK to LMK (Issuer side: Zone to Storage)
+     *
+     * Used by issuer when receiving PIN from acquirer for verification.
+     * The issuer receives PIN encrypted under ZPK, then re-encrypts under LMK
+     * for verification against stored PIN.
+     *
+     * Flow:
+     * 1. Acquirer sends ZPK-encrypted PIN to Issuer
+     * 2. Issuer calls this endpoint → translates ZPK to LMK
+     * 3. Issuer verifies LMK-encrypted PIN against database
+     *
+     * Request body:
+     * {
+     *   "pinBlockUnderZPK": "encrypted_hex_string",
+     *   "pan": "4111111111111111",
+     *   "pinFormat": "ISO-0",
+     *   "zpkKeyId": "uuid-of-zpk-key",
+     *   "lmkKeyId": "uuid-of-lmk-key"
+     * }
+     */
+    @PostMapping("/pin/translate/zpk-to-lmk")
+    public ResponseEntity<?> translateZpkToLmk(@RequestBody Map<String, String> request) {
+        String pinBlockUnderZPK = request.get("pinBlockUnderZPK");
+        String pan = request.get("pan");
+        String pinFormat = request.get("pinFormat");
+        String zpkKeyId = request.get("zpkKeyId");
+        String lmkKeyId = request.get("lmkKeyId");
+
+        log.info("API: Translating PIN block ZPK → LMK for PAN {}, format {}", pan, pinFormat);
+
+        try {
+            // Validate input
+            if (pinBlockUnderZPK == null || pan == null || pinFormat == null || zpkKeyId == null || lmkKeyId == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "error", "Missing required parameters: pinBlockUnderZPK, pan, pinFormat, zpkKeyId, lmkKeyId"
+                ));
+            }
+
+            // Translate PIN block
+            String pinBlockUnderLMK = pinGenerationService.translateZpkToLmk(
+                    pinBlockUnderZPK,
+                    pan,
+                    pinFormat,
+                    UUID.fromString(zpkKeyId),
+                    UUID.fromString(lmkKeyId)
+            );
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "PIN block translated from ZPK to LMK successfully",
+                    "pinBlockUnderLMK", pinBlockUnderLMK,
+                    "pan", pan,
+                    "pinFormat", pinFormat,
+                    "zpkKeyId", zpkKeyId,
+                    "lmkKeyId", lmkKeyId
+            ));
+        } catch (Exception e) {
+            log.error("Error translating PIN block ZPK → LMK", e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
      * POST /api/hsm/keys/initialize
      * Initialize complete key set for a specific bank or all banks
      *

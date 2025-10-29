@@ -383,6 +383,154 @@ public class PinGenerationService {
         }
     }
 
+    /**
+     * Translate PIN block from TPK to ZPK (Acquirer side: Terminal to Zone)
+     * Used when acquirer needs to forward PIN to issuer for inter-bank transaction
+     */
+    public String translateTpkToZpk(
+            String encryptedPinBlockUnderTPK,
+            String pan,
+            String pinFormat,
+            UUID tpkKeyId,
+            UUID zpkKeyId) {
+
+        log.info("========================================");
+        log.info("PIN TRANSLATION: TPK → ZPK (Acquirer)");
+        log.info("========================================");
+        log.info("PAN: {}", maskPan(pan));
+        log.info("PIN Format: {}", pinFormat);
+        log.info("TPK Key ID: {}", tpkKeyId);
+        log.info("ZPK Key ID: {}", zpkKeyId);
+
+        try {
+            // Step 1: Retrieve TPK key
+            MasterKey tpkKey = masterKeyRepository.findById(tpkKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("TPK key not found: " + tpkKeyId));
+
+            if (tpkKey.getKeyType() != KeyType.TPK) {
+                throw new IllegalArgumentException("Source key must be TPK, got: " + tpkKey.getKeyType());
+            }
+
+            log.info("TPK Key: {} ({})", tpkKey.getMasterKeyId(), tpkKey.getKeyType());
+
+            // Step 2: Retrieve ZPK key
+            MasterKey zpkKey = masterKeyRepository.findById(zpkKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("ZPK key not found: " + zpkKeyId));
+
+            if (zpkKey.getKeyType() != KeyType.ZPK) {
+                throw new IllegalArgumentException("Target key must be ZPK, got: " + zpkKey.getKeyType());
+            }
+
+            log.info("ZPK Key: {} ({})", zpkKey.getMasterKeyId(), zpkKey.getKeyType());
+
+            // Step 3: Decrypt PIN block under TPK
+            log.info("Step 1: Decrypting PIN block under TPK");
+            String clearPinBlock = decryptPinBlock(encryptedPinBlockUnderTPK, tpkKey);
+            log.info("Clear PIN block: {}", clearPinBlock);
+
+            // Step 4: Extract PIN from clear PIN block
+            log.info("Step 2: Extracting PIN from clear PIN block");
+            String pin = extractPinFromPinBlock(clearPinBlock, pan, pinFormat);
+            log.info("Extracted PIN: {}", maskPin(pin));
+
+            // Step 5: Create new PIN block
+            log.info("Step 3: Creating PIN block for ZPK encryption");
+            String newPinBlock = createPinBlock(pin, pan, pinFormat);
+            log.info("New PIN block: {}", newPinBlock);
+
+            // Step 6: Encrypt PIN block under ZPK
+            log.info("Step 4: Encrypting PIN block under ZPK");
+            String encryptedPinBlockUnderZPK = encryptPinBlock(newPinBlock, zpkKey);
+            log.info("Encrypted PIN block under ZPK: {}", encryptedPinBlockUnderZPK);
+
+            log.info("========================================");
+            log.info("TRANSLATION COMPLETE: TPK → ZPK");
+            log.info("========================================");
+
+            return encryptedPinBlockUnderZPK;
+
+        } catch (Exception e) {
+            log.error("========================================");
+            log.error("TRANSLATION ERROR (TPK → ZPK): {}", e.getMessage());
+            log.error("========================================", e);
+            throw new RuntimeException("PIN translation TPK to ZPK failed: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Translate PIN block from ZPK to LMK (Issuer side: Zone to Storage)
+     * Used when issuer receives PIN from acquirer and needs to verify against stored PIN
+     */
+    public String translateZpkToLmk(
+            String encryptedPinBlockUnderZPK,
+            String pan,
+            String pinFormat,
+            UUID zpkKeyId,
+            UUID lmkKeyId) {
+
+        log.info("========================================");
+        log.info("PIN TRANSLATION: ZPK → LMK (Issuer)");
+        log.info("========================================");
+        log.info("PAN: {}", maskPan(pan));
+        log.info("PIN Format: {}", pinFormat);
+        log.info("ZPK Key ID: {}", zpkKeyId);
+        log.info("LMK Key ID: {}", lmkKeyId);
+
+        try {
+            // Step 1: Retrieve ZPK key
+            MasterKey zpkKey = masterKeyRepository.findById(zpkKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("ZPK key not found: " + zpkKeyId));
+
+            if (zpkKey.getKeyType() != KeyType.ZPK) {
+                throw new IllegalArgumentException("Source key must be ZPK, got: " + zpkKey.getKeyType());
+            }
+
+            log.info("ZPK Key: {} ({})", zpkKey.getMasterKeyId(), zpkKey.getKeyType());
+
+            // Step 2: Retrieve LMK key
+            MasterKey lmkKey = masterKeyRepository.findById(lmkKeyId)
+                    .orElseThrow(() -> new IllegalArgumentException("LMK key not found: " + lmkKeyId));
+
+            if (lmkKey.getKeyType() != KeyType.LMK) {
+                throw new IllegalArgumentException("Target key must be LMK, got: " + lmkKey.getKeyType());
+            }
+
+            log.info("LMK Key: {} ({})", lmkKey.getMasterKeyId(), lmkKey.getKeyType());
+
+            // Step 3: Decrypt PIN block under ZPK
+            log.info("Step 1: Decrypting PIN block under ZPK");
+            String clearPinBlock = decryptPinBlock(encryptedPinBlockUnderZPK, zpkKey);
+            log.info("Clear PIN block: {}", clearPinBlock);
+
+            // Step 4: Extract PIN from clear PIN block
+            log.info("Step 2: Extracting PIN from clear PIN block");
+            String pin = extractPinFromPinBlock(clearPinBlock, pan, pinFormat);
+            log.info("Extracted PIN: {}", maskPin(pin));
+
+            // Step 5: Create new PIN block
+            log.info("Step 3: Creating PIN block for LMK encryption");
+            String newPinBlock = createPinBlock(pin, pan, pinFormat);
+            log.info("New PIN block: {}", newPinBlock);
+
+            // Step 6: Encrypt PIN block under LMK
+            log.info("Step 4: Encrypting PIN block under LMK");
+            String encryptedPinBlockUnderLMK = encryptPinBlock(newPinBlock, lmkKey);
+            log.info("Encrypted PIN block under LMK: {}", encryptedPinBlockUnderLMK);
+
+            log.info("========================================");
+            log.info("TRANSLATION COMPLETE: ZPK → LMK");
+            log.info("========================================");
+
+            return encryptedPinBlockUnderLMK;
+
+        } catch (Exception e) {
+            log.error("========================================");
+            log.error("TRANSLATION ERROR (ZPK → LMK): {}", e.getMessage());
+            log.error("========================================", e);
+            throw new RuntimeException("PIN translation ZPK to LMK failed: " + e.getMessage(), e);
+        }
+    }
+
     private String maskPin(String pin) {
         if (pin == null || pin.length() < 2) return "****";
         return pin.charAt(0) + "***" + pin.charAt(pin.length() - 1);
