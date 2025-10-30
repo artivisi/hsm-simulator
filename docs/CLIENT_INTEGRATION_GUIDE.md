@@ -47,18 +47,161 @@ All cryptographic operations in the HSM Simulator follow these standards:
 All operational keys are derived from master keys using:
 
 ```
-Context = "KEY_TYPE:BANK_ID:IDENTIFIER"
+Context = "KEY_TYPE:BANK_UUID:IDENTIFIER"
 ```
 
 Examples:
-- PIN Key: `"TPK:BANK-001:TERM-ATM-123"`
-- MAC Key: `"TSK:BANK-001:MAC"`
-- KEK: `"ZMK:BANK-001:KEK"`
+- PIN Key: `"TPK:48a9e84c-ff57-4483-bf83-b255f34a6466:PIN"`
+- MAC Key: `"TSK:48a9e84c-ff57-4483-bf83-b255f34a6466:MAC"`
+- KEK: `"ZMK:48a9e84c-ff57-4483-bf83-b255f34a6466:KEK"`
 
 **Important**: The derivation ensures that:
 1. Each terminal has a unique operational key
 2. Compromise of one terminal doesn't affect others
 3. No key truncation occurs (full 256-bit entropy used)
+
+⚠️ **CRITICAL**: `BANK_UUID` must be the **actual database UUID** (e.g., `48a9e84c-ff57-4483-bf83-b255f34a6466`), **NOT** the string `"GLOBAL"` or bank code like `"ISS001"`.
+
+### Client-Side Key Derivation (REQUIRED)
+
+**⚠️ CRITICAL REQUIREMENT**: Clients performing cryptographic operations (PIN encryption, MAC generation) **MUST derive operational keys** from master keys. **Never use master keys directly!**
+
+#### Why Key Derivation is Required
+
+| Scenario | Master Key | Operational Key | Result |
+|----------|-----------|-----------------|--------|
+| ❌ **Wrong** | 32-byte TPK (AES-256) | **Use directly** | BadPaddingException, decryption fails |
+| ✅ **Correct** | 32-byte TPK (AES-256) | **Derive 16-byte key** via PBKDF2 | Successful encryption/decryption |
+
+#### Key Derivation Algorithm
+
+```
+Algorithm: PBKDF2-SHA256
+Iterations: 100,000 (MUST match HSM)
+Salt: Context string as UTF-8 bytes
+Input: Master key hex as char array
+Output: 16 bytes (128 bits) for PIN/MAC operations
+```
+
+#### Java Implementation
+
+```java
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
+import java.nio.charset.StandardCharsets;
+
+/**
+ * Derive operational key from master key.
+ *
+ * CRITICAL: This MUST match the HSM's key derivation exactly!
+ *
+ * @param masterKeyBytes Master key (32 bytes for AES-256)
+ * @param context Context string (e.g., "TPK:48a9e84c-ff57-4483-bf83-b255f34a6466:PIN")
+ * @param outputBits Output key size in bits (128 for AES-128 PIN operations)
+ * @return Derived operational key
+ */
+public static byte[] deriveOperationalKey(byte[] masterKeyBytes, String context, int outputBits) {
+    try {
+        // Convert master key bytes to hex, then to char array
+        String masterKeyHex = bytesToHex(masterKeyBytes);
+        char[] keyChars = masterKeyHex.toCharArray();
+
+        // Use context as salt
+        byte[] salt = context.getBytes(StandardCharsets.UTF_8);
+
+        // PBKDF2 with 100,000 iterations (MUST match HSM!)
+        PBEKeySpec spec = new PBEKeySpec(keyChars, salt, 100_000, outputBits);
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+
+        return factory.generateSecret(spec).getEncoded();
+    } catch (Exception e) {
+        throw new RuntimeException("Key derivation failed", e);
+    }
+}
+
+// Example usage
+String tpkMasterKeyHex = "246A31D729B280DD7FCDA3BB7F187ABFA1BB0811D7EF3D68FDCA63579F3748B0"; // 64 hex chars = 32 bytes
+String bankUuid = "48a9e84c-ff57-4483-bf83-b255f34a6466"; // From database
+String context = "TPK:" + bankUuid + ":PIN";
+
+byte[] tpkMasterKey = hexToBytes(tpkMasterKeyHex); // 32 bytes
+byte[] tpkOperationalKey = deriveOperationalKey(tpkMasterKey, context, 128); // 16 bytes
+
+// Now use tpkOperationalKey (NOT tpkMasterKey!) for encryption
+```
+
+#### Python Implementation
+
+```python
+import hashlib
+from typing import bytes
+
+def derive_operational_key(master_key_bytes: bytes, context: str, output_bits: int = 128) -> bytes:
+    """
+    Derive operational key from master key using PBKDF2.
+
+    CRITICAL: This MUST match the HSM's key derivation exactly!
+
+    Args:
+        master_key_bytes: Master key (32 bytes for AES-256)
+        context: Context string (e.g., "TPK:48a9e84c-ff57-4483-bf83-b255f34a6466:PIN")
+        output_bits: Output key size in bits (128 for AES-128 PIN operations)
+
+    Returns:
+        Derived operational key
+    """
+    # Convert master key bytes to hex
+    master_key_hex = master_key_bytes.hex().upper()
+
+    # Use context as salt
+    salt = context.encode('utf-8')
+
+    # PBKDF2 with 100,000 iterations (MUST match HSM!)
+    output_bytes = output_bits // 8
+    derived_key = hashlib.pbkdf2_hmac(
+        'sha256',
+        master_key_hex.encode('utf-8'),
+        salt,
+        100_000,
+        dklen=output_bytes
+    )
+
+    return derived_key
+
+# Example usage
+tpk_master_key_hex = "246A31D729B280DD7FCDA3BB7F187ABFA1BB0811D7EF3D68FDCA63579F3748B0"
+bank_uuid = "48a9e84c-ff57-4483-bf83-b255f34a6466"
+context = f"TPK:{bank_uuid}:PIN"
+
+tpk_master_key = bytes.fromhex(tpk_master_key_hex)  # 32 bytes
+tpk_operational_key = derive_operational_key(tpk_master_key, context, 128)  # 16 bytes
+
+# Now use tpk_operational_key (NOT tpk_master_key!) for encryption
+```
+
+#### Configuration Setup
+
+**application.properties** (or equivalent):
+```properties
+# Master Key (from HSM database - 64 hex chars = 32 bytes)
+hsm.tpk.master.key=246A31D729B280DD7FCDA3BB7F187ABFA1BB0811D7EF3D68FDCA63579F3748B0
+
+# Bank UUID (from HSM database - MUST be actual UUID!)
+hsm.bank.uuid=48a9e84c-ff57-4483-bf83-b255f34a6466
+
+# DO NOT store derived keys - derive them at runtime!
+```
+
+#### Common Mistakes to Avoid
+
+| ❌ Wrong | ✅ Correct |
+|---------|-----------|
+| Use master key directly for encryption | Derive operational key first |
+| Context: `"TPK:GLOBAL:PIN"` | Context: `"TPK:48a9e84c...:PIN"` (actual UUID) |
+| Context: `"TPK:ISS001:PIN"` (bank code) | Context: `"TPK:48a9e84c...:PIN"` (actual UUID) |
+| Iterations: `10_000` | Iterations: `100_000` |
+| Key size: 32 bytes (AES-256) | Key size: 16 bytes (AES-128) for PIN ops |
+| Store derived keys in config | Derive at runtime from master key |
 
 ---
 
