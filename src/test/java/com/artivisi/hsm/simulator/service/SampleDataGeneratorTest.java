@@ -80,8 +80,11 @@ public class SampleDataGeneratorTest {
         byte[] tpkKey = CryptoUtils.hexToBytes(TPK_HEX);
 
         // Derive PIN operational keys (16 bytes for AES-128)
-        String lmkContext = "LMK:GLOBAL:PIN";
-        String tpkContext = "TPK:GLOBAL:PIN";
+        // IMPORTANT: Use actual bank UUID from database, NOT "GLOBAL"
+        // Bank ISS001 UUID: 48a9e84c-ff57-4483-bf83-b255f34a6466
+        String bankUuid = "48a9e84c-ff57-4483-bf83-b255f34a6466";
+        String lmkContext = "LMK:" + bankUuid + ":PIN";
+        String tpkContext = "TPK:" + bankUuid + ":PIN";
 
         byte[] lmkPinKey = CryptoUtils.deriveKeyFromParent(lmkKey, lmkContext, 128);
         byte[] tpkPinKey = CryptoUtils.deriveKeyFromParent(tpkKey, tpkContext, 128);
@@ -123,8 +126,10 @@ public class SampleDataGeneratorTest {
         System.out.println();
 
         // Derive MAC operational key from TSK (16 bytes for AES-128)
+        // IMPORTANT: Use actual bank UUID from database, NOT "GLOBAL"
         byte[] tskKey = CryptoUtils.hexToBytes(TSK_HEX);
-        String tskContext = "TSK:GLOBAL:MAC";
+        String bankUuid = "48a9e84c-ff57-4483-bf83-b255f34a6466";
+        String tskContext = "TSK:" + bankUuid + ":MAC";
         byte[] tskMacKey = CryptoUtils.deriveKeyFromParent(tskKey, tskContext, 128);
 
         System.out.println("Derived TSK MAC Key (first 8 bytes): " + CryptoUtils.bytesToHex(tskMacKey).substring(0, 16));

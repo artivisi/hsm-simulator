@@ -8,12 +8,15 @@
 -- Sample Banks (Four-Party Model)
 -- Purpose: Create sample banks representing Issuer, Acquirer, Switch, Processor
 -- ============================================================================
+-- IMPORTANT: Using fixed UUIDs for reproducibility in educational simulator
+-- These UUIDs are hardcoded to ensure consistency across migrations and tests
+-- ============================================================================
 
-INSERT INTO banks (bank_code, bank_name, bank_type, country_code, status) VALUES
-    ('ISS001', 'National Issuer Bank', 'ISSUER', 'IDN', 'ACTIVE'),
-    ('ACQ001', 'Merchant Acquirer Bank', 'ACQUIRER', 'IDN', 'ACTIVE'),
-    ('SWT001', 'National Payment Switch', 'SWITCH', 'IDN', 'ACTIVE'),
-    ('ISS002', 'Regional Issuer Bank', 'ISSUER', 'IDN', 'ACTIVE');
+INSERT INTO banks (id, bank_code, bank_name, bank_type, country_code, status) VALUES
+    ('48a9e84c-ff57-4483-bf83-b255f34a6466', 'ISS001', 'National Issuer Bank', 'ISSUER', 'IDN', 'ACTIVE'),
+    ('550e8400-e29b-41d4-a716-446655440001', 'ACQ001', 'Merchant Acquirer Bank', 'ACQUIRER', 'IDN', 'ACTIVE'),
+    ('550e8400-e29b-41d4-a716-446655440002', 'SWT001', 'National Payment Switch', 'SWITCH', 'IDN', 'ACTIVE'),
+    ('550e8400-e29b-41d4-a716-446655440003', 'ISS002', 'Regional Issuer Bank', 'ISSUER', 'IDN', 'ACTIVE');
 
 -- ============================================================================
 -- Sample Terminals
@@ -324,7 +327,7 @@ SELECT
     '4111111111111111',
     4,
     'ISO-0',
-    'A90224BD17F0014BEB5B00611135895238CCC855652673EB2835EEA98E567429',
+    '25BBDAB69938C6289C66975BF9315606D945728BF4870C7AB478898DF4E765C4',
     '0187',
     mk.id,
     '1234',
@@ -357,7 +360,7 @@ INSERT INTO generated_macs (
 SELECT
     '0800822000000000000004000000000000000000001234567890123456',
     58,
-    'B1D785D44EF4750E',
+    '1B96CB0A8C59E30E',
     'AES-CMAC',
     mk.id,
     'ACTIVE',
@@ -393,8 +396,8 @@ COMMENT ON TABLE generated_macs IS 'Sample MAC for testing MAC verification with
 --   Endpoint: POST /api/hsm/pin/verify-with-translation
 --   Request body:
 --   {
---     "pinBlockUnderTPK": "6AC549BC5B6DE9107AD6282D9CB55A5947E78F607B8EF473AB634FF4077A22C6",
---     "pinBlockUnderLMK": "A90224BD17F0014BEB5B00611135895238CCC855652673EB2835EEA98E567429",
+--     "pinBlockUnderTPK": "4AD5A9AB1F88975DC7F0CC1CA03FA5A9265F18718C610057B10E11906D0EC2C6",
+--     "pinBlockUnderLMK": "25BBDAB69938C6289C66975BF9315606D945728BF4870C7AB478898DF4E765C4",
 --     "pan": "4111111111111111",
 --     "pinFormat": "ISO-0",
 --     "terminalId": "TRM-ISS001-ATM-001"
@@ -405,7 +408,7 @@ COMMENT ON TABLE generated_macs IS 'Sample MAC for testing MAC verification with
 --   Endpoint: POST /api/hsm/pin/verify-with-pvv
 --   Request body:
 --   {
---     "pinBlockUnderTPK": "6AC549BC5B6DE9107AD6282D9CB55A5947E78F607B8EF473AB634FF4077A22C6",
+--     "pinBlockUnderTPK": "4AD5A9AB1F88975DC7F0CC1CA03FA5A9265F18718C610057B10E11906D0EC2C6",
 --     "storedPVV": "0187",
 --     "pan": "4111111111111111",
 --     "pinFormat": "ISO-0",
@@ -418,7 +421,7 @@ COMMENT ON TABLE generated_macs IS 'Sample MAC for testing MAC verification with
 --   Request body:
 --   {
 --     "message": "0800822000000000000004000000000000000000001234567890123456",
---     "mac": "B1D785D44EF4750E",
+--     "mac": "1B96CB0A8C59E30E",
 --     "algorithm": "AES-CMAC",
 --     "keyId": "<TSK-TRM-ISS001-ATM-001 UUID from database>"
 --   }
