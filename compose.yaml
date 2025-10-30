@@ -7,7 +7,7 @@ services:
       - 'POSTGRES_PASSWORD=xK9m2pQ8vR5nF7tA1sD3wE6zY'
       - 'POSTGRES_USER=hsm_user'
     ports:
-      - '5432:5432'
+      - '54321:5432'
     volumes:
       - ./db-hsm:/var/lib/postgresql/data
     healthcheck:
