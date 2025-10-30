@@ -177,20 +177,37 @@ public class HsmApiController {
      */
     @PostMapping("/pin/verify")
     public ResponseEntity<?> verifyPin(@RequestBody Map<String, String> request) {
-        log.info("API: Verifying PIN for account {}", request.get("accountNumber"));
+        String accountNumber = request.get("accountNumber");
+
+        log.info("========================================");
+        log.info("PIN VERIFICATION REQUEST - Simple Method");
+        log.info("========================================");
+        log.info("Account Number: {}", maskPan(accountNumber));
+        log.info("Endpoint: POST /api/hsm/pin/verify");
 
         try {
-            String accountNumber = request.get("accountNumber");
             String pin = request.get("pin");
 
             boolean isValid = pinGenerationService.verifyPin(accountNumber, pin);
+
+            log.info("----------------------------------------");
+            log.info("PIN VERIFICATION RESPONSE");
+            log.info("----------------------------------------");
+            log.info("Result: {}", isValid ? "SUCCESS" : "FAILED");
+            log.info("Account: {}", maskPan(accountNumber));
+            log.info("========================================");
 
             return ResponseEntity.ok(Map.of(
                     "valid", isValid,
                     "message", isValid ? "PIN is valid" : "PIN is invalid"
             ));
         } catch (Exception e) {
-            log.error("Error verifying PIN", e);
+            log.error("========================================");
+            log.error("PIN VERIFICATION ERROR");
+            log.error("Account: {}", maskPan(accountNumber));
+            log.error("Error: {}", e.getMessage());
+            log.error("========================================", e);
+
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));
@@ -212,8 +229,15 @@ public class HsmApiController {
         String pan = request.get("pan");
         String pinFormat = request.getOrDefault("pinFormat", "ISO-0");
 
-        log.info("API: Verifying PIN with translation for terminal {}, PAN {}, format {}",
-                terminalId, pan, pinFormat);
+        log.info("========================================");
+        log.info("PIN VERIFICATION REQUEST - Method A (Translation)");
+        log.info("========================================");
+        log.info("Endpoint: POST /api/hsm/pin/verify-with-translation");
+        log.info("Terminal ID: {}", terminalId);
+        log.info("PAN: {}", maskPan(pan));
+        log.info("PIN Format: {}", pinFormat);
+        log.info("PIN Block (TPK): {} chars", pinBlockUnderTPK != null ? pinBlockUnderTPK.length() : 0);
+        log.info("PIN Block (LMK): {} chars", pinBlockUnderLMK != null ? pinBlockUnderLMK.length() : 0);
 
         try {
             // Validate inputs
@@ -266,17 +290,33 @@ public class HsmApiController {
                     lmkKey.getId()
             );
 
+            log.info("========================================");
+            log.info("PIN VERIFICATION RESPONSE - Method A");
+            log.info("========================================");
+            log.info("Result: {}", isValid ? "SUCCESS" : "FAILED");
+            log.info("Terminal: {}", terminalId);
+            log.info("PAN: {}", maskPan(pan));
+            log.info("TPK Key: {}", tpkKey.getMasterKeyId());
+            log.info("LMK Key: {}", lmkKey.getMasterKeyId());
+            log.info("========================================");
+
             return ResponseEntity.ok(Map.of(
                     "valid", isValid,
                     "message", isValid ? "PIN verified successfully" : "PIN verification failed",
                     "terminalId", terminalId,
-                    "pan", pan,
+                    "pan", maskPan(pan),
                     "pinFormat", pinFormat,
                     "lmkKeyId", lmkKey.getMasterKeyId(),
                     "tpkKeyId", tpkKey.getMasterKeyId()
             ));
         } catch (Exception e) {
-            log.error("Error verifying PIN with translation", e);
+            log.error("========================================");
+            log.error("PIN VERIFICATION ERROR - Method A");
+            log.error("Terminal: {}", terminalId);
+            log.error("PAN: {}", maskPan(pan));
+            log.error("Error: {}", e.getMessage());
+            log.error("========================================", e);
+
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));
@@ -303,8 +343,15 @@ public class HsmApiController {
         String pan = request.get("pan");
         String pinFormat = request.getOrDefault("pinFormat", "ISO-0");
 
-        log.info("API: Verifying PIN with PVV for terminal {}, PAN {}, format {}",
-                terminalId, pan, pinFormat);
+        log.info("========================================");
+        log.info("PIN VERIFICATION REQUEST - Method B (PVV)");
+        log.info("========================================");
+        log.info("Endpoint: POST /api/hsm/pin/verify-with-pvv");
+        log.info("Terminal ID: {}", terminalId);
+        log.info("PAN: {}", maskPan(pan));
+        log.info("PIN Format: {}", pinFormat);
+        log.info("PIN Block (TPK): {} chars", pinBlockUnderTPK != null ? pinBlockUnderTPK.length() : 0);
+        log.info("Stored PVV: {}", storedPVV);
 
         try {
             // Validate inputs
@@ -356,19 +403,37 @@ public class HsmApiController {
                     pvkKey.getId()
             );
 
+            log.info("========================================");
+            log.info("PIN VERIFICATION RESPONSE - Method B (PVV)");
+            log.info("========================================");
+            log.info("Result: {}", isValid ? "SUCCESS" : "FAILED");
+            log.info("Method: PVV (PIN Verification Value) - ISO 9564");
+            log.info("Terminal: {}", terminalId);
+            log.info("PAN: {}", maskPan(pan));
+            log.info("TPK Key: {}", tpkKey.getMasterKeyId());
+            log.info("PVK Key: {}", pvkKey.getMasterKeyId());
+            log.info("Stored PVV: {}", storedPVV);
+            log.info("========================================");
+
             return ResponseEntity.ok(Map.of(
                     "valid", isValid,
                     "message", isValid ? "PIN verified successfully using PVV" : "PIN verification failed - PVV mismatch",
                     "method", "PVV (PIN Verification Value)",
                     "terminalId", terminalId,
-                    "pan", pan,
+                    "pan", maskPan(pan),
                     "pinFormat", pinFormat,
                     "tpkKeyId", tpkKey.getMasterKeyId(),
                     "pvkKeyId", pvkKey.getMasterKeyId(),
                     "storedPVV", storedPVV
             ));
         } catch (Exception e) {
-            log.error("Error verifying PIN with PVV", e);
+            log.error("========================================");
+            log.error("PIN VERIFICATION ERROR - Method B (PVV)");
+            log.error("Terminal: {}", terminalId);
+            log.error("PAN: {}", maskPan(pan));
+            log.error("Error: {}", e.getMessage());
+            log.error("========================================", e);
+
             return ResponseEntity.badRequest().body(Map.of(
                     "error", e.getMessage()
             ));
@@ -802,5 +867,15 @@ public class HsmApiController {
             log.error("Failed to calculate KCV", e);
             throw new RuntimeException("Failed to calculate KCV", e);
         }
+    }
+
+    /**
+     * Mask PAN for logging - shows first 6 and last 4 digits
+     */
+    private String maskPan(String pan) {
+        if (pan == null || pan.length() < 10) {
+            return "******";
+        }
+        return pan.substring(0, 6) + "******" + pan.substring(pan.length() - 4);
     }
 }

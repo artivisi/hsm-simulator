@@ -305,8 +305,9 @@ FROM terminals t WHERE t.terminal_id = 'TRM-ISS001-ATM-001';
 -- Sample PIN for testing
 -- PAN: 4111111111111111
 -- PIN: 1234
--- PIN Block (ISO-0): Encrypted under LMK-ISS001-SAMPLE
--- PVV: Pre-calculated for Method B verification
+-- PIN Block (ISO-0): 041225EEEEEEEEEE (clear), encrypted under LMK-ISS001-SAMPLE
+-- PVV: 0187 (calculated using SHA-256)
+-- Generated using: SampleDataGeneratorTest.java
 INSERT INTO generated_pins (
     account_number,
     pin_length,
@@ -323,8 +324,8 @@ SELECT
     '4111111111111111',
     4,
     'ISO-0',
-    'SAMPLE_ENCRYPTED_PIN_BLOCK_PLACEHOLDER_32_CHARS_HEX',
-    '1234',
+    'A90224BD17F0014BEB5B00611135895238CCC855652673EB2835EEA98E567429',
+    '0187',
     mk.id,
     '1234',
     'ACTIVE',
@@ -340,8 +341,9 @@ WHERE mk.master_key_id = 'LMK-ISS001-SAMPLE';
 
 -- Sample MAC for testing
 -- Message: "0800822000000000000004000000000000000000001234567890123456"
--- Algorithm: AES-CMAC
+-- Algorithm: AES-CMAC (NIST SP 800-38B)
 -- MAC Key: TSK-TRM-ISS001-ATM-001
+-- Generated using: SampleDataGeneratorTest.java
 INSERT INTO generated_macs (
     message,
     message_length,
@@ -355,7 +357,7 @@ INSERT INTO generated_macs (
 SELECT
     '0800822000000000000004000000000000000000001234567890123456',
     58,
-    'ABCDEF0123456789',
+    'B1D785D44EF4750E',
     'AES-CMAC',
     mk.id,
     'ACTIVE',
@@ -389,30 +391,41 @@ COMMENT ON TABLE generated_macs IS 'Sample MAC for testing MAC verification with
 --
 -- TESTING PIN VERIFICATION (Method A - with translation):
 --   Endpoint: POST /api/hsm/pin/verify-with-translation
---   PAN: 4111111111111111
---   PIN: 1234
---   Keys: LMK-ISS001-SAMPLE, TPK-TRM-ISS001-ATM-001
---   Terminal: TRM-ISS001-ATM-001
+--   Request body:
+--   {
+--     "pinBlockUnderTPK": "6AC549BC5B6DE9107AD6282D9CB55A5947E78F607B8EF473AB634FF4077A22C6",
+--     "pinBlockUnderLMK": "A90224BD17F0014BEB5B00611135895238CCC855652673EB2835EEA98E567429",
+--     "pan": "4111111111111111",
+--     "pinFormat": "ISO-0",
+--     "terminalId": "TRM-ISS001-ATM-001"
+--   }
+--   Expected: Valid PIN (1234)
 --
 -- TESTING PIN VERIFICATION (Method B - with PVV):
 --   Endpoint: POST /api/hsm/pin/verify-with-pvv
---   PAN: 4111111111111111
---   PIN: 1234
---   PVV: 1234 (stored in database)
---   Key: TPK-TRM-ISS001-ATM-001
---   Terminal: TRM-ISS001-ATM-001
+--   Request body:
+--   {
+--     "pinBlockUnderTPK": "6AC549BC5B6DE9107AD6282D9CB55A5947E78F607B8EF473AB634FF4077A22C6",
+--     "storedPVV": "0187",
+--     "pan": "4111111111111111",
+--     "pinFormat": "ISO-0",
+--     "terminalId": "TRM-ISS001-ATM-001"
+--   }
+--   Expected: Valid PIN (PVV matches)
 --
 -- TESTING MAC VERIFICATION:
 --   Endpoint: POST /api/hsm/mac/verify
---   Message: "0800822000000000000004000000000000000000001234567890123456"
---   MAC: ABCDEF0123456789 (16 hex chars, 64-bit)
---   Algorithm: AES-CMAC (NIST SP 800-38B)
---   Key: TSK-TRM-ISS001-ATM-001
+--   Request body:
+--   {
+--     "message": "0800822000000000000004000000000000000000001234567890123456",
+--     "mac": "B1D785D44EF4750E",
+--     "algorithm": "AES-CMAC",
+--     "keyId": "<TSK-TRM-ISS001-ATM-001 UUID from database>"
+--   }
+--   Expected: Valid MAC
 --
--- NOTE: The encrypted_pin_block and mac_value are placeholders.
---       To get real values, use the generation endpoints first:
---       - POST /api/hsm/pin/encrypt (for PIN blocks)
---       - POST /api/hsm/mac/generate (for MAC values)
+-- NOTE: All values are REAL encrypted data generated using SampleDataGeneratorTest.java
+--       PIN blocks and MAC values can be verified using the API endpoints above.
 --
 -- ============================================================================
 -- End of Migration V2
