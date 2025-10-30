@@ -113,50 +113,11 @@ VALUES ('4111111111111111', '8F4A2E1D9C7B5A3E6F8D2C4B7A9E5D3C', 'key-uuid');
 
 ---
 
-### 2. Verify PIN
-
-Verifies a PIN against stored encrypted value.
-
-**Endpoint**: `POST /api/hsm/pin/verify`
-
-**Request Body**:
-```json
-{
-  "accountNumber": "4111111111111111",
-  "pin": "1234"
-}
-```
-
-**Request Parameters**:
-- `accountNumber` (string, required): Primary Account Number
-- `pin` (string, required): Clear PIN to verify
-
-**Response**:
-```json
-{
-  "valid": true,
-  "message": "PIN is valid"
-}
-```
-
-**Response Fields**:
-- `valid` (boolean): True if PIN matches, false otherwise
-- `message` (string): Verification result message
-
-**Example**:
-```bash
-curl -X POST http://localhost:8080/api/hsm/pin/verify \
-  -H "Content-Type: application/json" \
-  -u user:password \
-  -d '{
-    "accountNumber": "4111111111111111",
-    "pin": "1234"
-  }'
-```
+**⚠️ IMPORTANT SECURITY NOTE**: Previous versions of this API included a `/api/hsm/pin/verify` endpoint that accepted cleartext PINs. This endpoint has been **removed** as it does not reflect real-world banking security practices. In production HSM systems, cleartext PINs are NEVER transmitted to or processed by the HSM. Always use the secure PIN verification methods below (Method A or Method B).
 
 ---
 
-### 3. Generate PIN Block
+### 2. Generate PIN Block
 
 Generates encrypted PIN block under LMK from plaintext PIN.
 
@@ -215,7 +176,7 @@ curl -X POST http://localhost:8080/api/hsm/pin/generate-pinblock \
 
 ---
 
-### 4. Verify PIN with Translation (Method A)
+### 3. Verify PIN with Translation (Method A)
 
 Verifies PIN by comparing encrypted PIN blocks from terminal and database. This method demonstrates the complete HSM flow where both encrypted PIN blocks are provided.
 
@@ -294,7 +255,7 @@ curl -X POST http://localhost:8080/api/hsm/pin/verify-with-translation \
 
 ---
 
-### 5. Verify PIN with PVV (Method B) ⭐ RECOMMENDED
+### 4. Verify PIN with PVV (Method B) ⭐ RECOMMENDED
 
 Verifies PIN using PVV (PIN Verification Value) method. This is the most common method in banking systems (ISO 9564 compliant) and offers better security than Method A.
 
@@ -418,7 +379,7 @@ curl -X POST http://localhost:8080/api/hsm/pin/verify-with-pvv \
 
 ## Zone PIN Translation
 
-### 6. Translate PIN Block: TPK → ZPK (Acquirer Side)
+### 5. Translate PIN Block: TPK → ZPK (Acquirer Side)
 
 Translates PIN block from Terminal PIN Key (TPK) to Zone PIN Key (ZPK) for inter-bank transmission.
 
@@ -510,7 +471,7 @@ TRANSLATION COMPLETE: TPK → ZPK
 
 ---
 
-### 7. Translate PIN Block: ZPK → LMK (Issuer Side)
+### 6. Translate PIN Block: ZPK → LMK (Issuer Side)
 
 Translates PIN block from Zone PIN Key (ZPK) to Local Master Key (LMK) for verification.
 
@@ -653,7 +614,7 @@ curl -X POST http://issuer-hsm:8080/api/hsm/pin/translate/zpk-to-lmk \
 
 ## MAC Operations
 
-### 6. Generate MAC
+### 7. Generate MAC
 
 Generates Message Authentication Code for message integrity.
 
@@ -710,7 +671,7 @@ curl -X POST http://localhost:8080/api/hsm/mac/generate \
 
 ---
 
-### 7. Verify MAC
+### 8. Verify MAC
 
 Verifies MAC authenticity for received message.
 
@@ -761,7 +722,7 @@ curl -X POST http://localhost:8080/api/hsm/mac/verify \
 
 ## Key Management
 
-### 8. Generate Key
+### 9. Generate Key
 
 Generates new cryptographic key (ZMK or TMK).
 
@@ -821,7 +782,7 @@ curl -X POST http://localhost:8080/api/hsm/key/generate \
 
 ---
 
-### 9. Initialize Complete Key Set ⚡ NEW
+### 10. Initialize Complete Key Set ⚡ NEW
 
 Initialize complete key hierarchy for all banks. This endpoint clears existing sample keys and creates a comprehensive key set including HSM Master Key, LMK, TMK, TPK, TSK, ZMK, ZPK, and ZSK for all banks and terminals.
 
@@ -1135,7 +1096,7 @@ curl -X POST http://localhost:8080/api/hsm/keys/initialize \
 
 ---
 
-### 10. Exchange Key
+### 11. Exchange Key
 
 Exchanges cryptographic key between encryption domains.
 

@@ -172,49 +172,6 @@ public class HsmApiController {
     }
 
     /**
-     * POST /api/hsm/pin/verify
-     * Verify PIN block
-     */
-    @PostMapping("/pin/verify")
-    public ResponseEntity<?> verifyPin(@RequestBody Map<String, String> request) {
-        String accountNumber = request.get("accountNumber");
-
-        log.info("========================================");
-        log.info("PIN VERIFICATION REQUEST - Simple Method");
-        log.info("========================================");
-        log.info("Account Number: {}", maskPan(accountNumber));
-        log.info("Endpoint: POST /api/hsm/pin/verify");
-
-        try {
-            String pin = request.get("pin");
-
-            boolean isValid = pinGenerationService.verifyPin(accountNumber, pin);
-
-            log.info("----------------------------------------");
-            log.info("PIN VERIFICATION RESPONSE");
-            log.info("----------------------------------------");
-            log.info("Result: {}", isValid ? "SUCCESS" : "FAILED");
-            log.info("Account: {}", maskPan(accountNumber));
-            log.info("========================================");
-
-            return ResponseEntity.ok(Map.of(
-                    "valid", isValid,
-                    "message", isValid ? "PIN is valid" : "PIN is invalid"
-            ));
-        } catch (Exception e) {
-            log.error("========================================");
-            log.error("PIN VERIFICATION ERROR");
-            log.error("Account: {}", maskPan(accountNumber));
-            log.error("Error: {}", e.getMessage());
-            log.error("========================================", e);
-
-            return ResponseEntity.badRequest().body(Map.of(
-                    "error", e.getMessage()
-            ));
-        }
-    }
-
-    /**
      * POST /api/hsm/pin/verify-with-translation
      * Verify PIN with TPK to LMK translation
      * Input: pinBlockUnderLMK, pinBlockUnderTPK, terminalId, pan, pinFormat
