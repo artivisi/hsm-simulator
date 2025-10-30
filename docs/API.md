@@ -1149,6 +1149,275 @@ curl -X POST http://localhost:8080/api/hsm/key/exchange \
 
 ---
 
+### 12. Key Rotation Operations
+
+The HSM Simulator provides comprehensive key rotation functionality with pending state tracking. This allows terminals and banks to update their keys in a controlled manner without service interruption.
+
+#### 12.1 Initiate Key Rotation
+
+Start rotation process for a master key. Creates new key and tracks all participants that need to update.
+
+**Endpoint**: `POST /api/hsm/key/rotate`
+
+**Request Body**:
+```json
+{
+  "keyId": "uuid-of-key-to-rotate",
+  "rotationType": "SCHEDULED",
+  "reason": "Regular 3-month rotation schedule",
+  "gracePeriodHours": 24,
+  "autoComplete": true
+}
+```
+
+**Request Parameters**:
+- `keyId` (string, required): UUID of key to rotate (must be ACTIVE)
+- `rotationType` (string, required): Type of rotation - `SCHEDULED`, `EMERGENCY`, `COMPLIANCE`, `COMPROMISE`, or `EXPIRATION`
+- `reason` (string, required): Reason for rotation (audit trail)
+- `gracePeriodHours` (integer, optional): Hours before old key is revoked (default: 24)
+- `autoComplete` (boolean, optional): Auto-complete when all participants confirm (default: true)
+
+**Response**:
+```json
+{
+  "rotationId": "550e8400-e29b-41d4-a716-446655440000",
+  "rotationIdString": "ROT-TMK-ABC12345",
+  "oldKeyId": "TMK-ISS001-OLD",
+  "newKeyId": "TMK-ISS001-NEW",
+  "rotationType": "SCHEDULED",
+  "rotationStatus": "IN_PROGRESS",
+  "rotationStartedAt": "2025-10-31T10:00:00",
+  "totalParticipants": 5,
+  "pendingParticipants": 5,
+  "confirmedParticipants": 0,
+  "failedParticipants": 0,
+  "message": "Rotation in progress. 5 of 5 participants pending."
+}
+```
+
+**Rotation Status Values**:
+- `IN_PROGRESS`: Rotation ongoing, participants updating keys
+- `COMPLETED`: All participants confirmed, old key revoked
+- `FAILED`: Rotation failed
+- `ROLLED_BACK`: Rotation cancelled, old key active
+- `CANCELLED`: Rotation cancelled by admin
+
+#### 12.2 Terminal Requests Updated Key
+
+ATM/Terminal requests new key during rotation. Returns encrypted key for secure delivery.
+
+**Endpoint**: `POST /api/hsm/terminal/{terminalId}/get-updated-key`
+
+**Request Body**:
+```json
+{
+  "terminalId": "TRM-ISS001-ATM-001",
+  "rotationId": "uuid-optional",
+  "currentKeyChecksum": "A8FC6D4EEB350415"
+}
+```
+
+**Request Parameters**:
+- `terminalId` (path, required): Terminal identifier
+- `rotationId` (body, optional): Specific rotation UUID (if not provided, returns latest pending)
+- `currentKeyChecksum` (body, optional): Current key checksum for verification
+
+**Response**:
+```json
+{
+  "rotationId": "550e8400-e29b-41d4-a716-446655440000",
+  "newKeyId": "TPK-TRM-ISS001-ATM-001-NEW",
+  "keyType": "TPK",
+  "encryptedNewKey": "A1B2C3D4...F0E1D2C3",
+  "newKeyChecksum": "B7A53E2FC461526",
+  "gracePeriodEndsAt": "2025-11-01T10:00:00",
+  "message": "New key delivered successfully. Please install and confirm."
+}
+```
+
+**Response Fields**:
+- `encryptedNewKey` (string): New key encrypted under current terminal key (hex with IV prepended)
+- `newKeyChecksum` (string): Checksum of new key for verification after installation
+- `gracePeriodEndsAt` (string): When old key will be revoked
+
+**Key Encryption for Delivery**:
+- New key is encrypted using AES-128-CBC with current terminal key
+- Derivation context: `"KEY_DELIVERY:ROTATION"`
+- Random IV prepended to encrypted data
+- Terminal must decrypt using operational key derived from current master key
+
+#### 12.3 Terminal Confirms Key Installation
+
+Terminal confirms successful installation of new key.
+
+**Endpoint**: `POST /api/hsm/terminal/{terminalId}/confirm-key-update`
+
+**Request Body**:
+```json
+{
+  "rotationId": "550e8400-e29b-41d4-a716-446655440000",
+  "confirmedBy": "TERMINAL_APP_v2.1"
+}
+```
+
+**Request Parameters**:
+- `terminalId` (path, required): Terminal identifier
+- `rotationId` (body, required): Rotation UUID
+- `confirmedBy` (body, optional): Confirmation source (default: terminalId)
+
+**Response**:
+```json
+{
+  "rotationId": "550e8400-e29b-41d4-a716-446655440000",
+  "rotationIdString": "ROT-TPK-ABC12345",
+  "oldKeyId": "TPK-TRM-ISS001-ATM-001-OLD",
+  "newKeyId": "TPK-TRM-ISS001-ATM-001-NEW",
+  "rotationType": "SCHEDULED",
+  "rotationStatus": "COMPLETED",
+  "totalParticipants": 1,
+  "pendingParticipants": 0,
+  "confirmedParticipants": 1,
+  "failedParticipants": 0,
+  "message": "All participants confirmed. Rotation ready to complete."
+}
+```
+
+**Auto-Completion**:
+If `autoComplete` was set to `true` and all participants have confirmed, the rotation will automatically complete and the old key will be marked as `ROTATED`.
+
+#### 12.4 Get Rotation Status
+
+Check current status of rotation with participant details.
+
+**Endpoint**: `GET /api/hsm/rotation/{rotationId}/status`
+
+**Response**:
+```json
+{
+  "rotationId": "550e8400-e29b-41d4-a716-446655440000",
+  "rotationIdString": "ROT-TMK-ABC12345",
+  "oldKeyId": "TMK-ISS001-OLD",
+  "newKeyId": "TMK-ISS001-NEW",
+  "rotationType": "SCHEDULED",
+  "rotationStatus": "IN_PROGRESS",
+  "rotationStartedAt": "2025-10-31T10:00:00",
+  "totalParticipants": 5,
+  "pendingParticipants": 2,
+  "confirmedParticipants": 3,
+  "failedParticipants": 0,
+  "message": "Rotation in progress. 2 of 5 participants pending."
+}
+```
+
+#### 12.5 Complete Rotation Manually
+
+Manually complete rotation and revoke old key. Use after grace period or when all participants confirmed.
+
+**Endpoint**: `POST /api/hsm/rotation/{rotationId}/complete`
+
+**Request Body** (optional):
+```json
+{
+  "completedBy": "admin"
+}
+```
+
+**Response**:
+```json
+{
+  "rotationId": "550e8400-e29b-41d4-a716-446655440000",
+  "rotationIdString": "ROT-TPK-ABC12345",
+  "oldKeyId": "TPK-TRM-ISS001-ATM-001-OLD",
+  "newKeyId": "TPK-TRM-ISS001-ATM-001-NEW",
+  "rotationType": "SCHEDULED",
+  "rotationStatus": "COMPLETED",
+  "message": "Rotation completed successfully. Old key has been rotated."
+}
+```
+
+**Effect**:
+- Old key status changed to `ROTATED`
+- Old key revocation timestamp recorded
+- Rotation status changed to `COMPLETED`
+
+#### 12.6 Rollback Rotation
+
+Cancel rotation and revert to old key. New key is revoked.
+
+**Endpoint**: `POST /api/hsm/rotation/{rotationId}/rollback`
+
+**Request Body**:
+```json
+{
+  "reason": "Terminal installation failed on 3 devices",
+  "rolledBackBy": "admin"
+}
+```
+
+**Request Parameters**:
+- `reason` (string, required): Reason for rollback (audit trail)
+- `rolledBackBy` (string, optional): Who initiated rollback
+
+**Response**:
+```json
+{
+  "rotationId": "550e8400-e29b-41d4-a716-446655440000",
+  "rotationIdString": "ROT-TPK-ABC12345",
+  "oldKeyId": "TPK-TRM-ISS001-ATM-001-OLD",
+  "newKeyId": "TPK-TRM-ISS001-ATM-001-NEW",
+  "rotationType": "EMERGENCY",
+  "rotationStatus": "ROLLED_BACK",
+  "message": "Rotation rolled back. Old key remains active, new key revoked."
+}
+```
+
+**Effect**:
+- New key status changed to `REVOKED`
+- Old key remains `ACTIVE`
+- Rotation status changed to `ROLLED_BACK`
+
+### Key Rotation Workflow Example
+
+**Scenario**: Rotating TPK for a single ATM terminal
+
+```bash
+# 1. Administrator initiates rotation
+curl -X POST http://localhost:8080/api/hsm/key/rotate \
+  -H "Content-Type: application/json" \
+  -u admin:password \
+  -d '{
+    "keyId": "uuid-of-old-tpk",
+    "rotationType": "SCHEDULED",
+    "reason": "Regular 3-month rotation",
+    "gracePeriodHours": 24
+  }'
+
+# Response: rotationId = "550e8400-..."
+
+# 2. ATM terminal requests new key
+curl -X POST http://localhost:8080/api/hsm/terminal/TRM-ISS001-ATM-001/get-updated-key \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rotationId": "550e8400-...",
+    "currentKeyChecksum": "A8FC6D4E"
+  }'
+
+# Response: encryptedNewKey = "hex-encoded-encrypted-key"
+
+# 3. Terminal installs new key and confirms
+curl -X POST http://localhost:8080/api/hsm/terminal/TRM-ISS001-ATM-001/confirm-key-update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rotationId": "550e8400-...",
+    "confirmedBy": "ATM_SOFTWARE_v3.2"
+  }'
+
+# Response: rotationStatus = "COMPLETED" (auto-completed)
+# Old key is now ROTATED, new key is ACTIVE
+```
+
+---
+
 ## Key Types Reference
 
 ### Keys Generated During Initialization

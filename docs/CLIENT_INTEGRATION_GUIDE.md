@@ -771,6 +771,472 @@ mac = generate_mac(tsk_master_key_hex, bank_uuid, message)
 
 ---
 
+## Key Rotation Operations
+
+### Overview
+
+The HSM supports secure key rotation with **pending state tracking**. This allows ATM terminals and banking applications to update keys without service interruption.
+
+**Key Rotation States:**
+- `PENDING`: Terminal/bank needs to fetch new key
+- `DELIVERED`: New key sent to terminal (encrypted)
+- `CONFIRMED`: Terminal confirmed key installation
+- `FAILED`: Update failed
+- `IN_PROGRESS`: Rotation ongoing
+- `COMPLETED`: All participants confirmed, old key rotated
+
+### Rotation Workflow
+
+```
+1. HSM Administrator → Initiate Rotation
+   ↓
+2. HSM → Generate New Key, Create Rotation Record (IN_PROGRESS)
+   ↓
+3. HSM → Identify Participants (all terminals/banks affected)
+   ↓
+4. Terminal/ATM → Request New Key
+   ↓
+5. HSM → Encrypt New Key under Current Key → Return to Terminal
+   ↓
+6. Terminal → Decrypt New Key, Install, Test
+   ↓
+7. Terminal → Confirm Installation to HSM
+   ↓
+8. HSM → Check if All Participants Confirmed
+   ↓
+9. HSM → Auto-Complete Rotation (revoke old key)
+```
+
+### Client-Side Implementation
+
+#### Java: Terminal Key Rotation Handler
+
+```java
+import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+
+public class TerminalKeyRotationHandler {
+
+    private final String hsmBaseUrl;
+    private final String terminalId;
+    private final HttpClient httpClient;
+
+    public TerminalKeyRotationHandler(String hsmBaseUrl, String terminalId) {
+        this.hsmBaseUrl = hsmBaseUrl;
+        this.terminalId = terminalId;
+        this.httpClient = HttpClient.newHttpClient();
+    }
+
+    /**
+     * Check for pending key rotation and update keys if available.
+     * This should be called periodically (e.g., every hour) or on terminal startup.
+     */
+    public boolean checkAndUpdateKeys() throws Exception {
+        System.out.println("Checking for pending key rotation...");
+
+        // Step 1: Request new key from HSM
+        TerminalKeyUpdateResponse response = requestNewKey();
+
+        if (response == null) {
+            System.out.println("No pending rotation found.");
+            return false;
+        }
+
+        System.out.println("New key available for rotation: " + response.getRotationId());
+        System.out.println("Key type: " + response.getKeyType());
+        System.out.println("Grace period ends: " + response.getGracePeriodEndsAt());
+
+        // Step 2: Decrypt new key using current master key
+        byte[] newKeyData = decryptNewKey(
+                response.getEncryptedNewKey(),
+                getCurrentMasterKey() // Your current TPK/TSK master key
+        );
+
+        // Step 3: Verify new key checksum
+        String computedChecksum = calculateKeyChecksum(newKeyData);
+        if (!computedChecksum.equals(response.getNewKeyChecksum())) {
+            throw new SecurityException("New key checksum mismatch!");
+        }
+
+        // Step 4: Install new key (store securely)
+        installNewKey(newKeyData, response.getKeyType());
+
+        // Step 5: Test new key with HSM (optional but recommended)
+        boolean testPassed = testNewKey(newKeyData);
+        if (!testPassed) {
+            throw new RuntimeException("New key test failed!");
+        }
+
+        // Step 6: Confirm successful installation to HSM
+        confirmKeyInstallation(response.getRotationId());
+
+        System.out.println("Key rotation completed successfully!");
+        return true;
+    }
+
+    /**
+     * Request new key from HSM during rotation.
+     */
+    private TerminalKeyUpdateResponse requestNewKey() throws Exception {
+        String url = hsmBaseUrl + "/api/hsm/terminal/" + terminalId + "/get-updated-key";
+
+        String requestBody = String.format("""
+            {
+              "terminalId": "%s",
+              "currentKeyChecksum": "%s"
+            }
+            """, terminalId, getCurrentKeyChecksum());
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() == 400) {
+            // No pending rotation or terminal not involved
+            return null;
+        }
+
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Failed to request new key: " + response.body());
+        }
+
+        // Parse JSON response
+        return parseTerminalKeyUpdateResponse(response.body());
+    }
+
+    /**
+     * Decrypt new key received from HSM.
+     * HSM encrypts new key under current terminal key for secure delivery.
+     */
+    private byte[] decryptNewKey(String encryptedKeyHex, byte[] currentMasterKey) throws Exception {
+        // Derive operational key from current master key
+        // CRITICAL: Use same derivation context as HSM
+        String context = "KEY_DELIVERY:ROTATION";
+        byte[] decryptionKey = deriveOperationalKey(currentMasterKey, context, 128);
+
+        // Convert hex to bytes
+        byte[] encryptedWithIv = hexToBytes(encryptedKeyHex);
+
+        // Extract IV (first 16 bytes) and ciphertext
+        byte[] iv = Arrays.copyOfRange(encryptedWithIv, 0, 16);
+        byte[] ciphertext = Arrays.copyOfRange(encryptedWithIv, 16, encryptedWithIv.length);
+
+        // Decrypt using AES-128-CBC
+        Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+        SecretKeySpec keySpec = new SecretKeySpec(decryptionKey, "AES");
+        IvParameterSpec ivSpec = new IvParameterSpec(iv);
+
+        cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec);
+        return cipher.doFinal(ciphertext);
+    }
+
+    /**
+     * Install new key in secure storage.
+     * In real ATM: Store in tamper-resistant hardware security module.
+     */
+    private void installNewKey(byte[] newKeyData, String keyType) {
+        // Store new key securely
+        // Example: Write to encrypted key storage
+        SecureKeyStorage.store(keyType, newKeyData);
+        System.out.println("New " + keyType + " installed successfully");
+    }
+
+    /**
+     * Test new key with HSM before confirming.
+     * Example: Encrypt a test PIN block and verify with HSM.
+     */
+    private boolean testNewKey(byte[] newKeyData) throws Exception {
+        // Derive operational key from new master key
+        String bankUuid = "48a9e84c-ff57-4483-bf83-b255f34a6466";
+        String context = "TPK:" + bankUuid + ":PIN";
+        byte[] newOperationalKey = deriveOperationalKey(newKeyData, context, 128);
+
+        // Test encryption with new key
+        // ... perform test PIN encryption ...
+
+        return true; // Test passed
+    }
+
+    /**
+     * Confirm successful key installation to HSM.
+     */
+    private void confirmKeyInstallation(String rotationId) throws Exception {
+        String url = hsmBaseUrl + "/api/hsm/terminal/" + terminalId + "/confirm-key-update";
+
+        String requestBody = String.format("""
+            {
+              "rotationId": "%s",
+              "confirmedBy": "TERMINAL_APP_v3.2"
+            }
+            """, rotationId);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Failed to confirm key installation: " + response.body());
+        }
+
+        System.out.println("Key installation confirmed with HSM");
+    }
+
+    // Helper methods (implement these based on previous examples)
+    private byte[] deriveOperationalKey(byte[] masterKey, String context, int outputBits) {
+        // Use PBKDF2 derivation (see Client-Side Key Derivation section)
+        // ...
+    }
+
+    private String getCurrentKeyChecksum() {
+        // Return checksum of current active key
+        // ...
+    }
+
+    private byte[] getCurrentMasterKey() {
+        // Retrieve current master key from secure storage
+        // ...
+    }
+
+    private String calculateKeyChecksum(byte[] keyData) {
+        // Calculate SHA-256 checksum and return first 16 hex chars
+        // ...
+    }
+}
+
+// Usage in terminal application
+public class TerminalApplication {
+    public static void main(String[] args) {
+        TerminalKeyRotationHandler rotationHandler = new TerminalKeyRotationHandler(
+                "https://hsm.bank.com",
+                "TRM-ISS001-ATM-001"
+        );
+
+        // Check for key rotation every hour
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                boolean keysUpdated = rotationHandler.checkAndUpdateKeys();
+                if (keysUpdated) {
+                    System.out.println("Keys rotated successfully");
+                }
+            } catch (Exception e) {
+                System.err.println("Key rotation check failed: " + e.getMessage());
+            }
+        }, 0, 1, TimeUnit.HOURS);
+    }
+}
+```
+
+#### Python: Terminal Key Rotation Handler
+
+```python
+import hashlib
+import requests
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.backends import default_backend
+import schedule
+import time
+
+class TerminalKeyRotationHandler:
+    def __init__(self, hsm_base_url: str, terminal_id: str):
+        self.hsm_base_url = hsm_base_url
+        self.terminal_id = terminal_id
+
+    def check_and_update_keys(self) -> bool:
+        """
+        Check for pending key rotation and update keys if available.
+        Returns True if keys were rotated, False otherwise.
+        """
+        print("Checking for pending key rotation...")
+
+        # Step 1: Request new key from HSM
+        response = self.request_new_key()
+
+        if response is None:
+            print("No pending rotation found.")
+            return False
+
+        print(f"New key available for rotation: {response['rotationId']}")
+        print(f"Key type: {response['keyType']}")
+        print(f"Grace period ends: {response['gracePeriodEndsAt']}")
+
+        # Step 2: Decrypt new key
+        new_key_data = self.decrypt_new_key(
+            response['encryptedNewKey'],
+            self.get_current_master_key()
+        )
+
+        # Step 3: Verify checksum
+        computed_checksum = self.calculate_key_checksum(new_key_data)
+        if computed_checksum != response['newKeyChecksum']:
+            raise SecurityError("New key checksum mismatch!")
+
+        # Step 4: Install new key
+        self.install_new_key(new_key_data, response['keyType'])
+
+        # Step 5: Test new key
+        if not self.test_new_key(new_key_data):
+            raise RuntimeError("New key test failed!")
+
+        # Step 6: Confirm installation
+        self.confirm_key_installation(response['rotationId'])
+
+        print("Key rotation completed successfully!")
+        return True
+
+    def request_new_key(self) -> dict:
+        """Request new key from HSM during rotation."""
+        url = f"{self.hsm_base_url}/api/hsm/terminal/{self.terminal_id}/get-updated-key"
+
+        payload = {
+            "terminalId": self.terminal_id,
+            "currentKeyChecksum": self.get_current_key_checksum()
+        }
+
+        response = requests.post(url, json=payload)
+
+        if response.status_code == 400:
+            return None  # No pending rotation
+
+        if response.status_code != 200:
+            raise RuntimeError(f"Failed to request new key: {response.text}")
+
+        return response.json()
+
+    def decrypt_new_key(self, encrypted_key_hex: str, current_master_key: bytes) -> bytes:
+        """Decrypt new key received from HSM."""
+        # Derive operational key from current master key
+        context = "KEY_DELIVERY:ROTATION"
+        decryption_key = self.derive_operational_key(current_master_key, context, 128)
+
+        # Convert hex to bytes
+        encrypted_with_iv = bytes.fromhex(encrypted_key_hex)
+
+        # Extract IV and ciphertext
+        iv = encrypted_with_iv[:16]
+        ciphertext = encrypted_with_iv[16:]
+
+        # Decrypt using AES-128-CBC
+        cipher = Cipher(
+            algorithms.AES(decryption_key),
+            modes.CBC(iv),
+            backend=default_backend()
+        )
+        decryptor = cipher.decryptor()
+        decrypted = decryptor.update(ciphertext) + decryptor.finalize()
+
+        # Remove PKCS5 padding
+        padding_length = decrypted[-1]
+        return decrypted[:-padding_length]
+
+    def install_new_key(self, new_key_data: bytes, key_type: str):
+        """Install new key in secure storage."""
+        # Store new key securely
+        SecureKeyStorage.store(key_type, new_key_data)
+        print(f"New {key_type} installed successfully")
+
+    def test_new_key(self, new_key_data: bytes) -> bool:
+        """Test new key with HSM before confirming."""
+        # Derive operational key and test encryption
+        # ...
+        return True
+
+    def confirm_key_installation(self, rotation_id: str):
+        """Confirm successful key installation to HSM."""
+        url = f"{self.hsm_base_url}/api/hsm/terminal/{self.terminal_id}/confirm-key-update"
+
+        payload = {
+            "rotationId": rotation_id,
+            "confirmedBy": "TERMINAL_APP_v3.2"
+        }
+
+        response = requests.post(url, json=payload)
+
+        if response.status_code != 200:
+            raise RuntimeError(f"Failed to confirm installation: {response.text}")
+
+        print("Key installation confirmed with HSM")
+
+    def derive_operational_key(self, master_key: bytes, context: str, output_bits: int) -> bytes:
+        """Derive operational key using PBKDF2 (see previous sections)."""
+        # ... PBKDF2 implementation ...
+        pass
+
+    def get_current_master_key(self) -> bytes:
+        """Retrieve current master key from secure storage."""
+        pass
+
+    def get_current_key_checksum(self) -> str:
+        """Return checksum of current active key."""
+        pass
+
+    def calculate_key_checksum(self, key_data: bytes) -> str:
+        """Calculate SHA-256 checksum, return first 16 hex chars."""
+        hash_value = hashlib.sha256(key_data).hexdigest()
+        return hash_value[:16].upper()
+
+# Usage
+def main():
+    handler = TerminalKeyRotationHandler(
+        "https://hsm.bank.com",
+        "TRM-ISS001-ATM-001"
+    )
+
+    # Check for rotation every hour
+    schedule.every(1).hours.do(handler.check_and_update_keys)
+
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
+
+if __name__ == "__main__":
+    main()
+```
+
+### Key Rotation Best Practices
+
+**For Terminal/ATM Developers:**
+
+1. **Periodic Checks**: Check for pending rotations hourly or on startup
+2. **Graceful Handling**: Continue operations with old key during grace period
+3. **Test Before Confirm**: Always test new key before confirming installation
+4. **Secure Storage**: Store master keys in tamper-resistant hardware
+5. **Checksum Verification**: Always verify key checksums after decryption
+6. **Rollback Support**: Keep old key active until confirmation
+7. **Logging**: Log all rotation events for audit trail
+
+**Security Warnings:**
+
+❌ **DO NOT**:
+- Store decrypted keys in plaintext memory for extended periods
+- Skip checksum verification
+- Confirm installation before testing new key
+- Ignore rotation requests indefinitely
+
+✅ **DO**:
+- Use derived operational keys (never use master keys directly)
+- Verify checksums before and after decryption
+- Test new keys thoroughly before confirming
+- Implement automatic rotation checks
+- Support rollback if new key fails
+
+---
+
 ## Code Examples
 
 ### Complete Client Implementation (Java)
