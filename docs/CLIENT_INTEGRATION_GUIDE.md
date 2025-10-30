@@ -62,7 +62,77 @@ Examples:
 
 ⚠️ **CRITICAL**: `BANK_UUID` must be the **actual database UUID** (e.g., `48a9e84c-ff57-4483-bf83-b255f34a6466`), **NOT** the string `"GLOBAL"` or bank code like `"ISS001"`.
 
-### Client-Side Key Derivation (REQUIRED)
+---
+
+## Key Management
+
+### Key Types and Hierarchy
+
+```
+HSM_MASTER_KEY (Root)
+├── LMK (Local Master Key) - PIN storage
+├── TMK (Terminal Master Key) - Terminal operations
+│   ├── TPK (Terminal PIN Key) - Derived per terminal
+│   └── TSK (Terminal Security Key) - Derived per terminal
+└── ZMK (Zone Master Key) - Inter-bank operations
+    ├── ZPK (Zone PIN Key) - Derived per zone
+    └── ZSK (Zone Session Key) - Derived per zone
+```
+
+### Key Generation Methods
+
+#### 1. Key Ceremony (Recommended for Production)
+
+The most secure method using Shamir Secret Sharing (2-of-3 threshold):
+
+```http
+POST /api/ceremony/start
+Content-Type: application/json
+
+{
+  "numberOfCustodians": 3,
+  "threshold": 2,
+  "keySize": 256,
+  "algorithm": "AES",
+  "purpose": "Production LMK Generation"
+}
+```
+
+**Security Features:**
+- Multi-custodian authorization required
+- PBKDF2-SHA256 key derivation (100,000 iterations)
+- Unique random salt per share (32 bytes)
+- AES-256-GCM share encryption with random IV
+- SHA-256 verification hashes
+
+#### 2. Secure Random Generation (For Testing)
+
+```http
+POST /api/keys/initialize/lmk
+Content-Type: application/json
+
+{
+  "keySize": 256
+}
+```
+
+**Response:**
+```json
+{
+  "masterKeyId": "LMK-20251030-001",
+  "keyType": "LMK",
+  "algorithm": "AES",
+  "keySize": 256,
+  "keyFingerprint": "a1b2c3d4e5f6789012345678",
+  "keyChecksum": "abc123def456",
+  "generationMethod": "SECURE_RANDOM",
+  "status": "ACTIVE"
+}
+```
+
+---
+
+## Client-Side Key Derivation (REQUIRED)
 
 **⚠️ CRITICAL REQUIREMENT**: Clients performing cryptographic operations (PIN encryption, MAC generation) **MUST derive operational keys** from master keys. **Never use master keys directly!**
 
@@ -72,6 +142,48 @@ Examples:
 |----------|-----------|-----------------|--------|
 | ❌ **Wrong** | 32-byte TPK (AES-256) | **Use directly** | BadPaddingException, decryption fails |
 | ✅ **Correct** | 32-byte TPK (AES-256) | **Derive 16-byte key** via PBKDF2 | Successful encryption/decryption |
+
+#### Why PBKDF2 Instead of Simple Truncation?
+
+**Question**: Why not just truncate the 32-byte master key to 16 bytes?
+
+```java
+// ❌ Why is this WRONG and INSECURE?
+byte[] tpkMasterKey = hexToBytes(tpkMasterKeyHex); // 32 bytes
+byte[] operationalKey = Arrays.copyOf(tpkMasterKey, 16); // Just take first 16 bytes
+```
+
+**Security Justification:**
+
+| Approach | Security Issues | Mitigation via PBKDF2 |
+|----------|----------------|----------------------|
+| **Simple Truncation** | • No domain separation (PIN key = MAC key if same master key)<br>• Predictable relationship between master and operational keys<br>• No computational barrier to brute-force<br>• Same key across different contexts | ✅ Context-based derivation creates unique keys per purpose<br>✅ One-way function prevents master key recovery<br>✅ 100,000 iterations add computational cost<br>✅ Different contexts yield cryptographically independent keys |
+| **Direct Use (32-byte)** | • Key size mismatch with HSM's operational key size<br>• HSM expects AES-128 (16 bytes) for PIN/MAC ops<br>• Decryption failure due to wrong key | ✅ Consistent 16-byte operational keys<br>✅ Matches HSM's derived key exactly<br>✅ Successful encryption/decryption |
+
+**Real-World Impact:**
+
+```java
+// Example: Bank ISS001 has TPK master key
+byte[] tpkMaster = hexToBytes("246A31D7..."); // 32 bytes
+
+// ❌ INSECURE: Simple truncation
+byte[] pinKey = Arrays.copyOf(tpkMaster, 16);
+byte[] macKey = Arrays.copyOf(tpkMaster, 16);
+// Result: pinKey == macKey (SAME KEY FOR DIFFERENT PURPOSES!)
+
+// ✅ SECURE: PBKDF2 with different contexts
+byte[] pinKey = deriveKey(tpkMaster, "TPK:48a9e84c...:PIN", 128);
+byte[] macKey = deriveKey(tpkMaster, "TPK:48a9e84c...:MAC", 128);
+// Result: pinKey ≠ macKey (cryptographically independent)
+```
+
+**Key Benefits of PBKDF2 Derivation:**
+
+1. **Domain Separation**: Different contexts (":PIN", ":MAC", ":KEK") produce completely different keys from the same master key
+2. **Forward Security**: Compromising an operational key doesn't reveal the master key or other operational keys
+3. **Brute-Force Protection**: 100,000 iterations make offline attacks computationally expensive
+4. **Standard Compliance**: PBKDF2-SHA256 is NIST-approved (SP 800-132) for key derivation
+5. **Context Binding**: Keys are cryptographically bound to their intended purpose and bank UUID
 
 #### Key Derivation Algorithm
 
@@ -202,74 +314,6 @@ hsm.bank.uuid=48a9e84c-ff57-4483-bf83-b255f34a6466
 | Iterations: `10_000` | Iterations: `100_000` |
 | Key size: 32 bytes (AES-256) | Key size: 16 bytes (AES-128) for PIN ops |
 | Store derived keys in config | Derive at runtime from master key |
-
----
-
-## Key Management
-
-### Key Types and Hierarchy
-
-```
-HSM_MASTER_KEY (Root)
-├── LMK (Local Master Key) - PIN storage
-├── TMK (Terminal Master Key) - Terminal operations
-│   ├── TPK (Terminal PIN Key) - Derived per terminal
-│   └── TSK (Terminal Security Key) - Derived per terminal
-└── ZMK (Zone Master Key) - Inter-bank operations
-    ├── ZPK (Zone PIN Key) - Derived per zone
-    └── ZSK (Zone Session Key) - Derived per zone
-```
-
-### Key Generation Methods
-
-#### 1. Key Ceremony (Recommended for Production)
-
-The most secure method using Shamir Secret Sharing (2-of-3 threshold):
-
-```http
-POST /api/ceremony/start
-Content-Type: application/json
-
-{
-  "numberOfCustodians": 3,
-  "threshold": 2,
-  "keySize": 256,
-  "algorithm": "AES",
-  "purpose": "Production LMK Generation"
-}
-```
-
-**Security Features:**
-- Multi-custodian authorization required
-- PBKDF2-SHA256 key derivation (100,000 iterations)
-- Unique random salt per share (32 bytes)
-- AES-256-GCM share encryption with random IV
-- SHA-256 verification hashes
-
-#### 2. Secure Random Generation (For Testing)
-
-```http
-POST /api/keys/initialize/lmk
-Content-Type: application/json
-
-{
-  "keySize": 256
-}
-```
-
-**Response:**
-```json
-{
-  "masterKeyId": "LMK-20251030-001",
-  "keyType": "LMK",
-  "algorithm": "AES",
-  "keySize": 256,
-  "keyFingerprint": "a1b2c3d4e5f6789012345678",
-  "keyChecksum": "abc123def456",
-  "generationMethod": "SECURE_RANDOM",
-  "status": "ACTIVE"
-}
-```
 
 ---
 
@@ -447,21 +491,96 @@ public class PinEncryption {
 }
 ```
 
+### Client-Side MAC Key Derivation (REQUIRED)
+
+**⚠️ CRITICAL REQUIREMENT**: Just like PIN operations, MAC generation/verification **MUST use derived operational keys** from TSK (Terminal Security Key) master key. **Never use TSK master key directly!**
+
+#### Key Derivation for MAC Operations
+
+| Scenario | TSK Master Key | MAC Operational Key | Result |
+|----------|---------------|---------------------|--------|
+| ❌ **Wrong** | 32-byte TSK (AES-256) | **Use directly** | MAC mismatch, verification fails |
+| ✅ **Correct** | 32-byte TSK (AES-256) | **Derive 16-byte key** via PBKDF2 | Successful MAC generation/verification |
+
+**Why Not Simple Truncation for MAC Keys?**
+
+Just like PIN operations, **PBKDF2 derivation is required instead of truncation** for the same security reasons:
+
+- **Domain Separation**: Prevents using the same key material for different purposes (authentication vs. encryption)
+- **Forward Security**: Compromising MAC key doesn't reveal TSK master key
+- **Brute-Force Protection**: 100,000 iterations add computational cost to attacks
+- **Context Binding**: MAC keys are cryptographically bound to bank UUID and MAC purpose
+
+**Example of the Problem:**
+
+```python
+# ❌ INSECURE: Truncation means same key for all purposes
+tsk_master = bytes.fromhex("3AC63878...")  # 32 bytes
+mac_key = tsk_master[:16]  # Just take first 16 bytes
+enc_key = tsk_master[:16]  # SAME KEY - security violation!
+
+# ✅ SECURE: PBKDF2 creates different keys per context
+mac_key = derive_key(tsk_master, "TSK:48a9e84c...:MAC", 128)
+enc_key = derive_key(tsk_master, "TSK:48a9e84c...:ENC", 128)
+# Result: mac_key ≠ enc_key (cryptographically independent)
+```
+
+**Derivation Parameters:**
+```
+Algorithm: PBKDF2-SHA256
+Iterations: 100,000 (MUST match HSM)
+Context: "TSK:<BANK_UUID>:MAC"
+Output: 16 bytes (128 bits) for AES-CMAC operations
+```
+
+**Example Context:**
+```
+Context = "TSK:48a9e84c-ff57-4483-bf83-b255f34a6466:MAC"
+```
+
+⚠️ **CRITICAL**: Use the **actual database UUID** of the bank (e.g., `48a9e84c-ff57-4483-bf83-b255f34a6466`), **NOT** `"GLOBAL"` or bank code like `"ISS001"`.
+
 ### AES-CMAC Implementation (Client Side)
 
-#### Java Example:
+#### Java Example with Key Derivation:
 
 ```java
 import javax.crypto.Mac;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 
 public class MacGeneration {
 
-    public static String calculateAesCmac(byte[] macKey256, String message, int outputBytes) throws Exception {
+    /**
+     * Derive MAC operational key from TSK master key.
+     * MUST match HSM's key derivation!
+     */
+    public static byte[] deriveMacKey(byte[] tskMasterKey, String bankUuid) throws Exception {
+        // Convert master key to hex
+        String masterKeyHex = bytesToHex(tskMasterKey);
+        char[] keyChars = masterKeyHex.toCharArray();
+
+        // Create context for MAC operations
+        String context = "TSK:" + bankUuid + ":MAC";
+        byte[] salt = context.getBytes(StandardCharsets.UTF_8);
+
+        // PBKDF2 with 100,000 iterations
+        PBEKeySpec spec = new PBEKeySpec(keyChars, salt, 100_000, 128); // 128 bits = 16 bytes
+        SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
+
+        return factory.generateSecret(spec).getEncoded();
+    }
+
+    /**
+     * Calculate AES-CMAC using derived operational key.
+     */
+    public static String calculateAesCmac(byte[] macKey128, String message, int outputBytes) throws Exception {
         // Initialize AES-CMAC
-        Mac mac = Mac.getInstance("AESCMAC");
-        SecretKeySpec keySpec = new SecretKeySpec(macKey256, "AES");
+        Mac mac = Mac.getInstance("AESCMAC", "BC"); // Requires BouncyCastle
+        SecretKeySpec keySpec = new SecretKeySpec(macKey128, "AES");
         mac.init(keySpec);
 
         // Calculate MAC
@@ -476,27 +595,83 @@ public class MacGeneration {
         return bytesToHex(macOutput);
     }
 
-    public static String calculateHmacSha256(byte[] macKey256, String message) throws Exception {
+    /**
+     * Complete example: Derive key and calculate MAC.
+     */
+    public static String generateMac(String tskMasterKeyHex, String bankUuid, String message) throws Exception {
+        // Step 1: Get TSK master key (32 bytes)
+        byte[] tskMasterKey = hexToBytes(tskMasterKeyHex);
+
+        // Step 2: Derive MAC operational key (16 bytes)
+        byte[] macKey = deriveMacKey(tskMasterKey, bankUuid);
+
+        // Step 3: Calculate MAC with derived key
+        return calculateAesCmac(macKey, message, 8); // 8 bytes for banking
+    }
+
+    public static String calculateHmacSha256(byte[] macKey128, String message) throws Exception {
         Mac mac = Mac.getInstance("HmacSHA256");
-        SecretKeySpec keySpec = new SecretKeySpec(macKey256, "HmacSHA256");
+        SecretKeySpec keySpec = new SecretKeySpec(macKey128, "HmacSHA256");
         mac.init(keySpec);
 
         byte[] macBytes = mac.doFinal(message.getBytes("UTF-8"));
         return bytesToHex(macBytes);
     }
 }
+
+// Usage example:
+String tskMasterKeyHex = "3AC638783EF600FE5E25E8A2EE5B0D222EB810DDF64C3681DD11AFEFAF41614B";
+String bankUuid = "48a9e84c-ff57-4483-bf83-b255f34a6466";
+String message = "0800822000000000000004000000000000000000001234567890123456";
+
+// ❌ WRONG: Using master key directly
+// String mac = calculateAesCmac(hexToBytes(tskMasterKeyHex), message, 8);
+
+// ✅ CORRECT: Derive operational key first
+String mac = generateMac(tskMasterKeyHex, bankUuid, message);
 ```
 
-#### Python Example:
+#### Python Example with Key Derivation:
 
 ```python
+import hashlib
 from cryptography.hazmat.primitives import cmac, hashes, hmac
 from cryptography.hazmat.primitives.ciphers import algorithms
 from cryptography.hazmat.backends import default_backend
 
-def calculate_aes_cmac(mac_key_256: bytes, message: str, output_bytes: int = 16) -> str:
-    """Calculate AES-CMAC"""
-    c = cmac.CMAC(algorithms.AES(mac_key_256), backend=default_backend())
+def derive_mac_key(tsk_master_key: bytes, bank_uuid: str) -> bytes:
+    """
+    Derive MAC operational key from TSK master key.
+    MUST match HSM's key derivation!
+
+    Args:
+        tsk_master_key: TSK master key (32 bytes for AES-256)
+        bank_uuid: Bank UUID from database (e.g., "48a9e84c-ff57-4483-bf83-b255f34a6466")
+
+    Returns:
+        Derived MAC key (16 bytes for AES-128)
+    """
+    # Convert master key to hex
+    master_key_hex = tsk_master_key.hex().upper()
+
+    # Create context for MAC operations
+    context = f"TSK:{bank_uuid}:MAC"
+    salt = context.encode('utf-8')
+
+    # PBKDF2 with 100,000 iterations
+    derived_key = hashlib.pbkdf2_hmac(
+        'sha256',
+        master_key_hex.encode('utf-8'),
+        salt,
+        100_000,
+        dklen=16  # 16 bytes = 128 bits
+    )
+
+    return derived_key
+
+def calculate_aes_cmac(mac_key_128: bytes, message: str, output_bytes: int = 16) -> str:
+    """Calculate AES-CMAC using derived operational key"""
+    c = cmac.CMAC(algorithms.AES(mac_key_128), backend=default_backend())
     c.update(message.encode('utf-8'))
     full_mac = c.finalize()
 
@@ -504,12 +679,54 @@ def calculate_aes_cmac(mac_key_256: bytes, message: str, output_bytes: int = 16)
     mac_output = full_mac[:output_bytes]
     return mac_output.hex().upper()
 
-def calculate_hmac_sha256(mac_key_256: bytes, message: str) -> str:
+def generate_mac(tsk_master_key_hex: str, bank_uuid: str, message: str) -> str:
+    """
+    Complete example: Derive key and calculate MAC.
+
+    Args:
+        tsk_master_key_hex: TSK master key as hex string (64 hex chars = 32 bytes)
+        bank_uuid: Bank UUID from database
+        message: Message to MAC
+
+    Returns:
+        MAC value as hex string
+    """
+    # Step 1: Get TSK master key (32 bytes)
+    tsk_master_key = bytes.fromhex(tsk_master_key_hex)
+
+    # Step 2: Derive MAC operational key (16 bytes)
+    mac_key = derive_mac_key(tsk_master_key, bank_uuid)
+
+    # Step 3: Calculate MAC with derived key
+    return calculate_aes_cmac(mac_key, message, output_bytes=8)  # 8 bytes for banking
+
+def calculate_hmac_sha256(mac_key_128: bytes, message: str) -> str:
     """Calculate HMAC-SHA256"""
-    h = hmac.HMAC(mac_key_256, hashes.SHA256(), backend=default_backend())
+    h = hmac.HMAC(mac_key_128, hashes.SHA256(), backend=default_backend())
     h.update(message.encode('utf-8'))
     return h.finalize().hex().upper()
+
+# Usage example:
+tsk_master_key_hex = "3AC638783EF600FE5E25E8A2EE5B0D222EB810DDF64C3681DD11AFEFAF41614B"
+bank_uuid = "48a9e84c-ff57-4483-bf83-b255f34a6466"
+message = "0800822000000000000004000000000000000000001234567890123456"
+
+# ❌ WRONG: Using master key directly
+# mac = calculate_aes_cmac(bytes.fromhex(tsk_master_key_hex), message, 8)
+
+# ✅ CORRECT: Derive operational key first
+mac = generate_mac(tsk_master_key_hex, bank_uuid, message)
 ```
+
+#### Common MAC Key Derivation Mistakes
+
+| ❌ Wrong | ✅ Correct |
+|---------|-----------|
+| Use TSK master key (32 bytes) directly | Derive 16-byte operational key via PBKDF2 |
+| Context: `"TSK:GLOBAL:MAC"` | Context: `"TSK:48a9e84c...:MAC"` (actual UUID) |
+| Context: `"TSK:ISS001:MAC"` (bank code) | Context: `"TSK:48a9e84c...:MAC"` (actual UUID) |
+| Different iteration count | Exactly 100,000 iterations |
+| Store derived keys in config | Derive at runtime from master key |
 
 ---
 
