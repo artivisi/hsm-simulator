@@ -1,5 +1,6 @@
 package com.artivisi.hsm.simulator.service;
 
+import com.artivisi.hsm.simulator.config.CryptoConstants;
 import com.artivisi.hsm.simulator.entity.GeneratedMac;
 import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
@@ -10,15 +11,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.crypto.Cipher;
+import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Service for MAC (Message Authentication Code) generation and verification
+ * Service for MAC (Message Authentication Code) generation and verification.
+ * Uses modern AES-CMAC and HMAC-SHA256 algorithms.
  */
 @Service
 @Slf4j
@@ -27,6 +30,10 @@ public class MacService {
 
     private final GeneratedMacRepository generatedMacRepository;
     private final MasterKeyRepository masterKeyRepository;
+    private final KeyGenerationService keyGenerationService;
+
+    // Cache for derived MAC keys to avoid re-deriving on every operation
+    private final ConcurrentHashMap<String, byte[]> derivedKeyCache = new ConcurrentHashMap<>();
 
     /**
      * Generate MAC for a message using specified key
@@ -99,110 +106,124 @@ public class MacService {
      * Calculate MAC using specified algorithm
      */
     private String calculateMac(String message, MasterKey key, String algorithm) {
-        return switch (algorithm) {
-            case "ISO9797-ALG3" -> calculateRetailMac(message, key);
-            case "HMAC-SHA256" -> calculateHmacSha256(message, key);
-            case "CBC-MAC" -> calculateCbcMac(message, key);
-            default -> throw new IllegalArgumentException("Unsupported MAC algorithm: " + algorithm);
+        return switch (algorithm.toUpperCase()) {
+            case "AES-CMAC" -> calculateAesCmac(message, key, CryptoConstants.MAC_KEY_BYTES, CryptoConstants.MAC_OUTPUT_BYTES);
+            case "AES-CMAC-256" -> calculateAesCmac(message, key, CryptoConstants.MAC_KEY_BYTES, CryptoConstants.MAC_OUTPUT_BYTES);
+            case "AES-CMAC-128" -> calculateAesCmac(message, key, CryptoConstants.MAC_KEY_BYTES_COMPAT, CryptoConstants.MAC_OUTPUT_BYTES);
+            case "AES-CMAC-64" -> calculateAesCmac(message, key, CryptoConstants.MAC_KEY_BYTES_COMPAT, CryptoConstants.MAC_OUTPUT_BYTES_COMPAT);
+            case "HMAC-SHA256" -> calculateHmacSha256(message, key, CryptoConstants.MAC_OUTPUT_BYTES);
+            case "HMAC-SHA256-FULL" -> calculateHmacSha256(message, key, 32); // Full 256-bit output
+            case "HMAC-SHA256-64" -> calculateHmacSha256(message, key, CryptoConstants.MAC_OUTPUT_BYTES_COMPAT);
+            default -> throw new IllegalArgumentException("Unsupported MAC algorithm: " + algorithm +
+                ". Supported: AES-CMAC, AES-CMAC-256, AES-CMAC-128, AES-CMAC-64, HMAC-SHA256, HMAC-SHA256-FULL, HMAC-SHA256-64");
         };
     }
 
     /**
-     * ISO 9797-1 Algorithm 3 (Retail MAC)
-     * Single DES CBC over message, then 3DES on final block
+     * AES-CMAC (NIST SP 800-38B)
+     * Modern replacement for DES-based MAC
+     *
+     * @param message Message to authenticate
+     * @param key Master key (will derive appropriate operational key)
+     * @param keySize Operational key size (16=AES-128, 32=AES-256)
+     * @param outputBytes MAC output length (8 for banking compatibility, 16 for full security)
      */
-    private String calculateRetailMac(String message, MasterKey key) {
+    private String calculateAesCmac(String message, MasterKey key, int keySize, int outputBytes) {
         try {
-            // Pad message to multiple of 8 bytes (DES block size)
+            // Derive operational MAC key using context
+            String context = keyGenerationService.buildKeyContext(
+                key.getKeyType().toString(),
+                key.getIdBank() != null ? key.getIdBank().toString() : "GLOBAL",
+                "MAC"
+            );
+
+            byte[] macKeyBytes = getOrDeriveMacKey(key, context, keySize);
+
+            // Use AES-CMAC
+            Mac mac = Mac.getInstance(CryptoConstants.MAC_ALGORITHM_CMAC);
+            SecretKeySpec secretKey = new SecretKeySpec(macKeyBytes, CryptoConstants.MASTER_KEY_ALGORITHM);
+            mac.init(secretKey);
+
             byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-            byte[] paddedMessage = padMessage(messageBytes, 8);
+            byte[] fullMac = mac.doFinal(messageBytes);
 
-            // Use first 8 bytes of key for DES
-            byte[] keyBytes = new byte[8];
-            System.arraycopy(key.getKeyDataEncrypted(), 0, keyBytes, 0,
-                    Math.min(8, key.getKeyDataEncrypted().length));
+            // Truncate if needed for banking compatibility
+            byte[] macOutput = (outputBytes < fullMac.length)
+                ? Arrays.copyOf(fullMac, outputBytes)
+                : fullMac;
 
-            // DES CBC over entire message
-            SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "DES");
-            Cipher cipher = Cipher.getInstance("DES/CBC/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey, new javax.crypto.spec.IvParameterSpec(new byte[8]));
+            log.debug("AES-CMAC calculated: key_size={}, output_bytes={}, context={}",
+                     keySize, outputBytes, context);
 
-            byte[] encrypted = cipher.doFinal(paddedMessage);
+            return bytesToHex(macOutput);
 
-            // Take last 8 bytes (last block)
-            byte[] lastBlock = new byte[8];
-            System.arraycopy(encrypted, encrypted.length - 8, lastBlock, 0, 8);
-
-            // For full retail MAC, would do 3DES on last block, but for simulation we'll use the DES result
-            return bytesToHex(lastBlock);
         } catch (Exception e) {
-            throw new RuntimeException("Failed to calculate Retail MAC", e);
+            log.error("Failed to calculate AES-CMAC for key: {}", key.getId(), e);
+            throw new RuntimeException("Failed to calculate AES-CMAC", e);
         }
     }
 
     /**
      * HMAC-SHA256 MAC
+     * Modern cryptographic hash-based MAC
+     *
+     * @param message Message to authenticate
+     * @param key Master key (will derive appropriate operational key)
+     * @param outputBytes MAC output length (8, 16, or 32 bytes)
      */
-    private String calculateHmacSha256(String message, MasterKey key) {
+    private String calculateHmacSha256(String message, MasterKey key, int outputBytes) {
         try {
-            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA256");
-            SecretKeySpec secretKey = new SecretKeySpec(key.getKeyDataEncrypted(), "HmacSHA256");
+            // Derive operational MAC key using context
+            String context = keyGenerationService.buildKeyContext(
+                key.getKeyType().toString(),
+                key.getIdBank() != null ? key.getIdBank().toString() : "GLOBAL",
+                "HMAC"
+            );
+
+            byte[] macKeyBytes = getOrDeriveMacKey(key, context, CryptoConstants.MAC_KEY_BYTES);
+
+            Mac mac = Mac.getInstance(CryptoConstants.MAC_ALGORITHM_HMAC);
+            SecretKeySpec secretKey = new SecretKeySpec(macKeyBytes, CryptoConstants.MAC_ALGORITHM_HMAC);
             mac.init(secretKey);
+
             byte[] macBytes = mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
 
-            // Take first 8 bytes for compatibility with payment systems
-            byte[] truncated = new byte[8];
-            System.arraycopy(macBytes, 0, truncated, 0, 8);
+            // Truncate if needed
+            byte[] macOutput = (outputBytes < macBytes.length)
+                ? Arrays.copyOf(macBytes, outputBytes)
+                : macBytes;
 
-            return bytesToHex(truncated);
+            log.debug("HMAC-SHA256 calculated: output_bytes={}, context={}", outputBytes, context);
+
+            return bytesToHex(macOutput);
+
         } catch (Exception e) {
+            log.error("Failed to calculate HMAC-SHA256 for key: {}", key.getId(), e);
             throw new RuntimeException("Failed to calculate HMAC-SHA256", e);
         }
     }
 
     /**
-     * CBC-MAC (DES-based)
+     * Get derived MAC key from cache or derive it
      */
-    private String calculateCbcMac(String message, MasterKey key) {
-        try {
-            // Pad message to multiple of 8 bytes
-            byte[] messageBytes = message.getBytes(StandardCharsets.UTF_8);
-            byte[] paddedMessage = padMessage(messageBytes, 8);
-
-            // Use first 8 bytes of key for DES
-            byte[] keyBytes = new byte[8];
-            System.arraycopy(key.getKeyDataEncrypted(), 0, keyBytes, 0,
-                    Math.min(8, key.getKeyDataEncrypted().length));
-
-            SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "DES");
-            Cipher cipher = Cipher.getInstance("DES/CBC/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey, new javax.crypto.spec.IvParameterSpec(new byte[8]));
-
-            byte[] encrypted = cipher.doFinal(paddedMessage);
-
-            // Take last 8 bytes
-            byte[] mac = new byte[8];
-            System.arraycopy(encrypted, encrypted.length - 8, mac, 0, 8);
-
-            return bytesToHex(mac);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to calculate CBC-MAC", e);
-        }
+    private byte[] getOrDeriveMacKey(MasterKey key, String context, int keySize) {
+        String cacheKey = key.getId() + ":" + context + ":" + keySize;
+        return derivedKeyCache.computeIfAbsent(cacheKey, k -> {
+            log.debug("Deriving new MAC key: {}", cacheKey);
+            return keyGenerationService.deriveOperationalKey(
+                key.getKeyData(),
+                context,
+                keySize
+            );
+        });
     }
 
     /**
-     * Pad message to block size using ISO/IEC 9797-1 padding method 2
+     * Clear the derived key cache (useful for testing or key rotation)
      */
-    private byte[] padMessage(byte[] message, int blockSize) {
-        int paddingLength = blockSize - (message.length % blockSize);
-        byte[] padded = new byte[message.length + paddingLength];
-        System.arraycopy(message, 0, padded, 0, message.length);
-
-        // First padding byte is 0x80
-        padded[message.length] = (byte) 0x80;
-
-        // Rest are 0x00 (already initialized to 0)
-        return padded;
+    public void clearKeyCache() {
+        derivedKeyCache.clear();
+        log.info("Cleared MAC key cache");
     }
 
     private String bytesToHex(byte[] bytes) {

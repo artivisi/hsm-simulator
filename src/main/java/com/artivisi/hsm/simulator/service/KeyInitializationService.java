@@ -33,6 +33,7 @@ public class KeyInitializationService {
     private final MasterKeyRepository masterKeyRepository;
     private final BankRepository bankRepository;
     private final TerminalRepository terminalRepository;
+    private final KeyOperationService keyOperationService;
     private final SecureRandom secureRandom = new SecureRandom();
 
     /**
@@ -281,7 +282,7 @@ public class KeyInitializationService {
                 .idBank(bank.getId())
                 .algorithm("AES")
                 .keySize(keySize)
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .generationMethod("SECURE_RANDOM")
@@ -307,7 +308,7 @@ public class KeyInitializationService {
                 .idBank(bank.getId())
                 .algorithm("AES")
                 .keySize(keySize)
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .generationMethod("SECURE_RANDOM")
@@ -333,7 +334,7 @@ public class KeyInitializationService {
                 .idBank(bank.getId())
                 .algorithm("AES")
                 .keySize(keySize)
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .generationMethod("SECURE_RANDOM")
@@ -347,111 +348,59 @@ public class KeyInitializationService {
     }
 
     /**
-     * Create TPK (Terminal PIN Key) - child of TMK
+     * Create TPK (Terminal PIN Key) - child of TMK using PBKDF2 derivation
      */
     private MasterKey createTPK(MasterKey tmk, Terminal terminal, Integer keySize) {
-        byte[] keyData = generateRandomKey(keySize);
-        String masterKeyId = "TPK-" + terminal.getTerminalId() + "-" + generateShortId();
+        log.debug("Creating TPK for terminal {} using PBKDF2 derivation from TMK {}",
+                  terminal.getTerminalId(), tmk.getMasterKeyId());
 
-        MasterKey key = MasterKey.builder()
-                .masterKeyId(masterKeyId)
-                .keyType(KeyType.TPK)
-                .parentKeyId(tmk.getId())
-                .idTerminal(terminal.getId())
-                .algorithm("AES")
-                .keySize(keySize)
-                .keyDataEncrypted(keyData)
-                .keyFingerprint(generateFingerprint(keyData))
-                .keyChecksum(generateChecksum(keyData))
-                .generationMethod("DERIVED")
-                .kdfIterations(0)
-                .kdfSalt("N/A")
-                .status(MasterKey.KeyStatus.ACTIVE)
-                .activatedAt(LocalDateTime.now())
-                .build();
-
-        return masterKeyRepository.save(key);
+        return keyOperationService.generateTPK(
+            tmk.getId(),
+            terminal.getId(),
+            "Auto-generated during key initialization"
+        );
     }
 
     /**
-     * Create TSK (Terminal Security Key) - child of TMK
+     * Create TSK (Terminal Security Key) - child of TMK using PBKDF2 derivation
      */
     private MasterKey createTSK(MasterKey tmk, Terminal terminal, Integer keySize) {
-        byte[] keyData = generateRandomKey(keySize);
-        String masterKeyId = "TSK-" + terminal.getTerminalId() + "-" + generateShortId();
+        log.debug("Creating TSK for terminal {} using PBKDF2 derivation from TMK {}",
+                  terminal.getTerminalId(), tmk.getMasterKeyId());
 
-        MasterKey key = MasterKey.builder()
-                .masterKeyId(masterKeyId)
-                .keyType(KeyType.TSK)
-                .parentKeyId(tmk.getId())
-                .idTerminal(terminal.getId())
-                .algorithm("AES")
-                .keySize(keySize)
-                .keyDataEncrypted(keyData)
-                .keyFingerprint(generateFingerprint(keyData))
-                .keyChecksum(generateChecksum(keyData))
-                .generationMethod("DERIVED")
-                .kdfIterations(0)
-                .kdfSalt("N/A")
-                .status(MasterKey.KeyStatus.ACTIVE)
-                .activatedAt(LocalDateTime.now())
-                .build();
-
-        return masterKeyRepository.save(key);
+        return keyOperationService.generateTSK(
+            tmk.getId(),
+            terminal.getId(),
+            "Auto-generated during key initialization"
+        );
     }
 
     /**
-     * Create ZPK (Zone PIN Key) - child of ZMK
+     * Create ZPK (Zone PIN Key) - child of ZMK using PBKDF2 derivation
      */
     private MasterKey createZPK(MasterKey zmk, Bank bank, Integer keySize) {
-        byte[] keyData = generateRandomKey(keySize);
-        String masterKeyId = "ZPK-" + bank.getBankCode() + "-" + generateShortId();
+        log.debug("Creating ZPK for bank {} using PBKDF2 derivation from ZMK {}",
+                  bank.getBankCode(), zmk.getMasterKeyId());
 
-        MasterKey key = MasterKey.builder()
-                .masterKeyId(masterKeyId)
-                .keyType(KeyType.ZPK)
-                .parentKeyId(zmk.getId())
-                .idBank(bank.getId())
-                .algorithm("AES")
-                .keySize(keySize)
-                .keyDataEncrypted(keyData)
-                .keyFingerprint(generateFingerprint(keyData))
-                .keyChecksum(generateChecksum(keyData))
-                .generationMethod("DERIVED")
-                .kdfIterations(0)
-                .kdfSalt("N/A")
-                .status(MasterKey.KeyStatus.ACTIVE)
-                .activatedAt(LocalDateTime.now())
-                .build();
-
-        return masterKeyRepository.save(key);
+        return keyOperationService.generateZPK(
+            zmk.getId(),
+            bank.getBankCode(),
+            "Auto-generated during key initialization"
+        );
     }
 
     /**
-     * Create ZSK (Zone Session Key) - child of ZMK
+     * Create ZSK (Zone Session Key) - child of ZMK using PBKDF2 derivation
      */
     private MasterKey createZSK(MasterKey zmk, Bank bank, Integer keySize) {
-        byte[] keyData = generateRandomKey(keySize);
-        String masterKeyId = "ZSK-" + bank.getBankCode() + "-" + generateShortId();
+        log.debug("Creating ZSK for bank {} using PBKDF2 derivation from ZMK {}",
+                  bank.getBankCode(), zmk.getMasterKeyId());
 
-        MasterKey key = MasterKey.builder()
-                .masterKeyId(masterKeyId)
-                .keyType(KeyType.ZSK)
-                .parentKeyId(zmk.getId())
-                .idBank(bank.getId())
-                .algorithm("AES")
-                .keySize(keySize)
-                .keyDataEncrypted(keyData)
-                .keyFingerprint(generateFingerprint(keyData))
-                .keyChecksum(generateChecksum(keyData))
-                .generationMethod("DERIVED")
-                .kdfIterations(0)
-                .kdfSalt("N/A")
-                .status(MasterKey.KeyStatus.ACTIVE)
-                .activatedAt(LocalDateTime.now())
-                .build();
-
-        return masterKeyRepository.save(key);
+        return keyOperationService.generateZSK(
+            zmk.getId(),
+            bank.getBankCode(),
+            "Auto-generated during key initialization"
+        );
     }
 
     /**
@@ -500,7 +449,7 @@ public class KeyInitializationService {
                 .parentKeyId(sourceKey.getParentKeyId()) // Keep parent relationship if exists
                 .algorithm(sourceKey.getAlgorithm())
                 .keySize(sourceKey.getKeySize())
-                .keyDataEncrypted(sourceKey.getKeyDataEncrypted()) // COPY SAME KEY MATERIAL
+                .keyData(sourceKey.getKeyData()) // COPY SAME KEY MATERIAL
                 .keyFingerprint(sourceKey.getKeyFingerprint())
                 .keyChecksum(sourceKey.getKeyChecksum())
                 .generationMethod("SHARED_FROM_" + sourceKey.getMasterKeyId())
@@ -539,7 +488,8 @@ public class KeyInitializationService {
 
     private String generateChecksum(byte[] keyData) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("MD5");
+            // Use SHA-256 instead of MD5 for checksums
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(keyData);
             return bytesToHex(hash).substring(0, 16);
         } catch (NoSuchAlgorithmException e) {

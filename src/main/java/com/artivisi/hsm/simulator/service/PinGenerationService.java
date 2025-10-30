@@ -1,5 +1,6 @@
 package com.artivisi.hsm.simulator.service;
 
+import com.artivisi.hsm.simulator.config.CryptoConstants;
 import com.artivisi.hsm.simulator.entity.GeneratedPin;
 import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
@@ -11,10 +12,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Cipher;
+import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Service for PIN generation, encryption, and verification using HSM keys
@@ -26,7 +29,11 @@ public class PinGenerationService {
 
     private final GeneratedPinRepository generatedPinRepository;
     private final MasterKeyRepository masterKeyRepository;
+    private final KeyGenerationService keyGenerationService;
     private final SecureRandom secureRandom = new SecureRandom();
+
+    // Cache for derived PIN keys to avoid re-deriving on every operation
+    private final ConcurrentHashMap<String, byte[]> derivedKeyCache = new ConcurrentHashMap<>();
 
     /**
      * Generate a random PIN and encrypt it with the specified key
@@ -631,49 +638,101 @@ public class PinGenerationService {
 
     private String encryptPinBlock(String pinBlock, MasterKey key) {
         try {
-            // Use first 16 bytes of key for AES-128
-            byte[] keyBytes = new byte[16];
-            System.arraycopy(key.getKeyDataEncrypted(), 0, keyBytes, 0,
-                           Math.min(16, key.getKeyDataEncrypted().length));
+            // Derive operational PIN key using context
+            String context = keyGenerationService.buildKeyContext(
+                key.getKeyType().toString(),
+                key.getIdBank() != null ? key.getIdBank().toString() : "GLOBAL",
+                "PIN"
+            );
 
-            SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "AES");
-            Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
+            byte[] pinKeyBytes = getOrDerivePinKey(key, context);
+
+            // Use AES-128 CBC mode for secure PIN block encryption
+            SecretKeySpec secretKey = new SecretKeySpec(pinKeyBytes, CryptoConstants.MASTER_KEY_ALGORITHM);
+            Cipher cipher = Cipher.getInstance(CryptoConstants.PIN_CIPHER);
+
+            // Generate random IV for CBC mode
+            byte[] iv = new byte[CryptoConstants.CBC_IV_BYTES];
+            secureRandom.nextBytes(iv);
+            IvParameterSpec ivSpec = new IvParameterSpec(iv);
+
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
 
             // Convert hex PIN block to bytes
             byte[] pinBlockBytes = hexToBytes(pinBlock);
 
-            // Pad to 16 bytes if needed
-            byte[] paddedPinBlock = new byte[16];
-            System.arraycopy(pinBlockBytes, 0, paddedPinBlock, 0,
-                           Math.min(pinBlockBytes.length, 16));
+            // Encrypt (PKCS5Padding handles padding automatically)
+            byte[] encrypted = cipher.doFinal(pinBlockBytes);
 
-            byte[] encrypted = cipher.doFinal(paddedPinBlock);
-            return bytesToHex(encrypted);
+            // Prepend IV to encrypted data (IV:ciphertext)
+            byte[] result = new byte[iv.length + encrypted.length];
+            System.arraycopy(iv, 0, result, 0, iv.length);
+            System.arraycopy(encrypted, 0, result, iv.length, encrypted.length);
+
+            return bytesToHex(result);
         } catch (Exception e) {
+            log.error("Failed to encrypt PIN block", e);
             throw new RuntimeException("Failed to encrypt PIN block", e);
         }
     }
 
     private String decryptPinBlock(String encryptedPinBlock, MasterKey key) {
         try {
-            // Use first 16 bytes of key for AES-128
-            byte[] keyBytes = new byte[16];
-            System.arraycopy(key.getKeyDataEncrypted(), 0, keyBytes, 0,
-                           Math.min(16, key.getKeyDataEncrypted().length));
+            // Derive operational PIN key using context
+            String context = keyGenerationService.buildKeyContext(
+                key.getKeyType().toString(),
+                key.getIdBank() != null ? key.getIdBank().toString() : "GLOBAL",
+                "PIN"
+            );
 
-            SecretKeySpec secretKey = new SecretKeySpec(keyBytes, "AES");
-            Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
-            cipher.init(Cipher.DECRYPT_MODE, secretKey);
+            byte[] pinKeyBytes = getOrDerivePinKey(key, context);
 
-            // Convert hex encrypted PIN block to bytes
+            // Use AES-128 CBC mode
+            SecretKeySpec secretKey = new SecretKeySpec(pinKeyBytes, CryptoConstants.MASTER_KEY_ALGORITHM);
+            Cipher cipher = Cipher.getInstance(CryptoConstants.PIN_CIPHER);
+
+            // Convert hex to bytes
             byte[] encryptedBytes = hexToBytes(encryptedPinBlock);
 
-            byte[] decrypted = cipher.doFinal(encryptedBytes);
+            // Extract IV and ciphertext
+            byte[] iv = new byte[CryptoConstants.CBC_IV_BYTES];
+            byte[] ciphertext = new byte[encryptedBytes.length - CryptoConstants.CBC_IV_BYTES];
+            System.arraycopy(encryptedBytes, 0, iv, 0, CryptoConstants.CBC_IV_BYTES);
+            System.arraycopy(encryptedBytes, CryptoConstants.CBC_IV_BYTES, ciphertext, 0, ciphertext.length);
+
+            IvParameterSpec ivSpec = new IvParameterSpec(iv);
+            cipher.init(Cipher.DECRYPT_MODE, secretKey, ivSpec);
+
+            // Decrypt
+            byte[] decrypted = cipher.doFinal(ciphertext);
             return bytesToHex(decrypted);
         } catch (Exception e) {
+            log.error("Failed to decrypt PIN block", e);
             throw new RuntimeException("Failed to decrypt PIN block", e);
         }
+    }
+
+    /**
+     * Get derived PIN key from cache or derive it
+     */
+    private byte[] getOrDerivePinKey(MasterKey key, String context) {
+        String cacheKey = key.getId() + ":" + context;
+        return derivedKeyCache.computeIfAbsent(cacheKey, k -> {
+            log.debug("Deriving new PIN key: {}", cacheKey);
+            return keyGenerationService.deriveOperationalKey(
+                key.getKeyData(),
+                context,
+                CryptoConstants.PIN_KEY_BYTES  // 16 bytes for AES-128
+            );
+        });
+    }
+
+    /**
+     * Clear the derived key cache (useful for testing or key rotation)
+     */
+    public void clearKeyCache() {
+        derivedKeyCache.clear();
+        log.info("Cleared PIN key cache");
     }
 
     private String extractPinFromPinBlock(String clearPinBlock, String pan, String format) {
@@ -723,7 +782,7 @@ public class PinGenerationService {
     private String generatePVV(String pin, String accountNumber) {
         try {
             String input = pin + accountNumber;
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance(CryptoConstants.HASH_ALGORITHM);
             byte[] hash = digest.digest(input.getBytes());
 
             // Take first 4 digits from hash

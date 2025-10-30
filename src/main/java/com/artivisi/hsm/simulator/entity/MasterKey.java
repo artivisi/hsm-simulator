@@ -61,8 +61,8 @@ public class MasterKey {
     @Column(name = "key_size", nullable = false)
     private Integer keySize;
 
-    @Column(name = "key_data_encrypted", nullable = false, columnDefinition = "bytea")
-    private byte[] keyDataEncrypted;
+    @Column(name = "key_data", nullable = false, columnDefinition = "bytea")
+    private byte[] keyData;
 
     @Column(name = "key_fingerprint", nullable = false)
     private String keyFingerprint;

@@ -37,9 +37,18 @@ Buka browser: `http://localhost:8080`
 
 ## 📖 Dokumentasi
 
+**Complete documentation is available in the [docs/](docs/) directory:**
+
+- **[docs/API.md](docs/API.md)** - REST API reference with examples
+- **[docs/DATABASE.md](docs/DATABASE.md)** - Database schema and ERD
+- **[docs/CLIENT_INTEGRATION_GUIDE.md](docs/CLIENT_INTEGRATION_GUIDE.md)** - Integration guide (Java, Python, cURL)
+- **[docs/HELP.md](docs/HELP.md)** - Getting started and troubleshooting
+- **[docs/EMAIL_TESTING.md](docs/EMAIL_TESTING.md)** - Email configuration for key ceremony
+- **[docs/archive/](docs/archive/)** - Technical reports and audit documentation
+
 ### REST API Documentation
 Dokumentasi lengkap REST API untuk integrasi workshop dan external systems tersedia di:
-- **[API.md](API.md)** - Complete REST API reference dengan request/response examples, cURL commands, dan Java integration code
+- **[API Reference](docs/API.md)** - Complete REST API reference dengan request/response examples, cURL commands, dan Java integration code
 
 **API Endpoints:**
 - `POST /api/hsm/pin/encrypt` - Encrypt PIN block and generate PVV (ISO-0, ISO-1, ISO-3, ISO-4)
@@ -65,7 +74,7 @@ HSM Simulator menyediakan REST API yang kompatibel dengan [training-spring-jpos-
 
 ### Database Schema Documentation
 Dokumentasi lengkap database schema dengan ERD, table specifications, dan sample queries:
-- **[DATABASE.md](DATABASE.md)** - Complete database schema documentation
+- **[Database Schema](docs/DATABASE.md)** - Complete database schema documentation
 
 **Includes:**
 - 14 tables dengan full column specifications
@@ -86,14 +95,21 @@ Dokumentasi lengkap database schema dengan ERD, table specifications, dan sample
 - **Manajemen Kunci**: Generate, import, export, dan rotasi kunci kriptografi
 - **PIN Operations**: Pembuatan, verifikasi, dan translation PIN block (ISO-0, ISO-1, ISO-3, ISO-4)
   - PIN Generation: Generate random PIN dengan berbagai panjang (4-12 digit)
+  - PIN Encryption: AES-128-CBC dengan random IV dan PKCS5 padding
   - PIN Verification: Verifikasi PIN dengan tracking failed attempts
   - PIN Translation: Re-encrypt PIN dari satu key ke key lain dengan visualisasi 3-step
   - Format Support: ISO Format 0, 1, 3, 4 sesuai ISO 9564-1:2002
+  - Key Derivation: Context-based PBKDF2-SHA256 (no truncation)
 - **MAC Operations**: Message Authentication Code untuk integritas data
-  - ISO 9797-1 Algorithm 3 (Retail MAC, compatible with ANSI X9.19)
+  - AES-CMAC (NIST SP 800-38B) - Default algorithm
   - HMAC-SHA256 untuk keamanan modern
-  - CBC-MAC untuk legacy systems
+  - Support untuk berbagai output lengths (64-bit, 128-bit, 256-bit)
   - MAC Generation & Verification dengan audit trail
+- **Cryptographic Standards**:
+  - Master Keys: AES-256 storage
+  - Operational Keys: PBKDF2-SHA256 derivation (100,000 iterations)
+  - Hash Functions: SHA-256 (checksums, fingerprints, PVV)
+  - Key Wrapping: AES-256-GCM dengan random IV
 - **REST API**: Endpoint lengkap untuk integrasi workshop dan external systems
 
 ### 🌐 Arsitektur Perbankan
@@ -382,10 +398,11 @@ Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan de
 - ✅ **PVV Generation** - PIN Verification Value for offline validation
 
 #### MAC Operations
-- ✅ **MAC Generation** - ISO 9797-1 Algorithm 3 (Retail MAC, ANSI X9.19 compatible)
+- ✅ **MAC Generation** - AES-CMAC (NIST SP 800-38B) as default
 - ✅ **HMAC-SHA256** - Modern MAC with SHA-256
-- ✅ **CBC-MAC** - Legacy DES-based MAC
+- ✅ **Multiple Output Lengths** - 64-bit, 128-bit, 256-bit MAC support
 - ✅ **MAC Verification** - With attempt tracking and audit trail
+- ✅ **Banking Compatibility** - 64-bit MAC output for legacy system integration
 
 #### REST API for Integration
 - ✅ **PIN Encrypt API** - `/api/hsm/pin/encrypt` with all ISO formats
@@ -413,9 +430,10 @@ Arsitektur ini memastikan keamanan end-to-end untuk semua transaksi perbankan de
 #### Database & Documentation
 - ✅ **PostgreSQL 17** - With Flyway migrations (5 versions)
 - ✅ **14 Tables** - Complete schema for HSM operations
-- ✅ **REST API Documentation** - Complete with examples (API.md)
-- ✅ **Database Documentation** - Full schema reference (DATABASE.md)
+- ✅ **REST API Documentation** - Complete with examples ([docs/API.md](docs/API.md))
+- ✅ **Database Documentation** - Full schema reference ([docs/DATABASE.md](docs/DATABASE.md))
 - ✅ **User Manuals** - Step-by-step guides for all operations
+- ✅ **Client Integration Guide** - Java, Python, cURL examples ([docs/CLIENT_INTEGRATION_GUIDE.md](docs/CLIENT_INTEGRATION_GUIDE.md))
 
 ## 📚 Dokumentasi Penggunaan dan Pengujian
 
@@ -472,7 +490,7 @@ Skenario pengujian untuk memvalidasi fitur-fitur HSM Simulator:
 - **Frontend**: Thymeleaf dengan Layout Dialect + Tailwind CSS 4.1
 - **Database**: PostgreSQL 17 dengan Flyway migrations
 - **ORM**: Spring Data JPA dengan Hibernate 6.6.29
-- **Cryptography**: Java Cryptography Architecture (JCA) - AES, DES, SHA-256, HMAC
+- **Cryptography**: Java Cryptography Architecture (JCA) - AES-256, AES-CMAC, SHA-256, HMAC-SHA256, PBKDF2
 - **Testing**: TestContainer (PostgreSQL), JUnit 5, Playwright untuk E2E testing
 - **Build**: Maven dengan frontend-maven-plugin untuk npm integration
 

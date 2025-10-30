@@ -118,7 +118,7 @@ erDiagram
         varchar key_type
         varchar algorithm
         int key_size
-        bytea key_data_encrypted
+        bytea key_data
         varchar key_fingerprint
         varchar key_checksum
         varchar combined_entropy_hash
@@ -386,7 +386,7 @@ Unified table storing all cryptographic keys in the HSM hierarchy.
 | key_type | VARCHAR(50) | NOT NULL, CHECK | LMK, TMK, TPK, TSK, ZMK, ZPK, ZSK, KEK |
 | algorithm | VARCHAR(50) | NOT NULL | Encryption algorithm (AES, 3DES) |
 | key_size | INTEGER | NOT NULL | Key size in bits |
-| key_data_encrypted | BYTEA | NOT NULL | Encrypted key material |
+| key_data | BYTEA | NOT NULL | Key material (plaintext for educational purposes) |
 | key_fingerprint | VARCHAR(255) | NOT NULL | SHA-256 fingerprint |
 | key_checksum | VARCHAR(255) | NOT NULL | MD5 checksum (KCV) |
 | combined_entropy_hash | VARCHAR(255) | NOT NULL | Combined entropy hash |
@@ -477,7 +477,7 @@ Stores generated MACs for message authentication and integrity verification.
 | message | TEXT | NOT NULL | Original message authenticated |
 | message_length | INTEGER | NOT NULL | Message length in bytes |
 | mac_value | VARCHAR(64) | NOT NULL | Generated MAC (16 hex chars) |
-| mac_algorithm | VARCHAR(50) | NOT NULL, CHECK | ISO9797-ALG3, HMAC-SHA256, CBC-MAC |
+| mac_algorithm | VARCHAR(50) | NOT NULL, CHECK | AES-CMAC, AES-CMAC-128, AES-CMAC-256, HMAC-SHA256, HMAC-SHA256-FULL |
 | mac_key_id | UUID | FOREIGN KEY, NOT NULL | Reference to master_keys (TSK/ZSK) |
 | status | VARCHAR(20) | NOT NULL, CHECK | ACTIVE, EXPIRED, REVOKED |
 | verification_attempts | INTEGER | DEFAULT 0 | Verification attempt counter |
@@ -485,9 +485,11 @@ Stores generated MACs for message authentication and integrity verification.
 | generated_at | TIMESTAMP | NOT NULL | Generation timestamp |
 
 **MAC Algorithms**:
-- **ISO9797-ALG3**: Retail MAC (ISO 9797-1 Algorithm 3, compatible with ANSI X9.19)
-- **HMAC-SHA256**: HMAC with SHA-256 hash function
-- **CBC-MAC**: DES-based CBC-MAC
+- **AES-CMAC**: AES-CMAC with 64-bit output (NIST SP 800-38B, banking standard)
+- **AES-CMAC-128**: AES-CMAC with 128-bit output (full MAC value)
+- **AES-CMAC-256**: AES-CMAC with 256-bit output (extended security)
+- **HMAC-SHA256**: HMAC with SHA-256, 64-bit output (modern alternative)
+- **HMAC-SHA256-FULL**: HMAC with SHA-256, 256-bit output (full hash)
 
 **Indexes**:
 - `idx_generated_macs_mac_key_id` on `mac_key_id`
@@ -718,7 +720,7 @@ User authentication and authorization for HSM access control.
 - `banks.bank_type`: ISSUER, ACQUIRER, SWITCH, PROCESSOR
 - `terminals.terminal_type`: ATM, POS, MPOS, E_COMMERCE
 - `generated_pins.pin_format`: ISO-0, ISO-1, ISO-3, ISO-4
-- `generated_macs.mac_algorithm`: ISO9797-ALG3, HMAC-SHA256, CBC-MAC
+- `generated_macs.mac_algorithm`: AES-CMAC, AES-CMAC-128, AES-CMAC-256, HMAC-SHA256, HMAC-SHA256-FULL
 
 ### Foreign Key Constraints
 All foreign key relationships enforce referential integrity with ON DELETE restrictions.

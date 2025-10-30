@@ -1,5 +1,6 @@
 package com.artivisi.hsm.simulator.service;
 
+import com.artivisi.hsm.simulator.config.CryptoConstants;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -11,6 +12,7 @@ import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.ArrayList;
@@ -24,16 +26,6 @@ import java.util.List;
 @Service
 @Slf4j
 public class KeyGenerationService {
-
-    private static final String PBKDF2_ALGORITHM = "PBKDF2WithHmacSHA256";
-    private static final int PBKDF2_ITERATIONS = 100000;
-    private static final int KEY_LENGTH_BITS = 256;
-    private static final int KEY_LENGTH_BYTES = KEY_LENGTH_BITS / 8;
-
-    private static final String AES_ALGORITHM = "AES";
-    private static final String AES_CIPHER_MODE = "AES/GCM/NoPadding";
-    private static final int GCM_TAG_LENGTH = 128;
-    private static final int GCM_IV_LENGTH = 12;
 
     private final SecureRandom secureRandom;
 
@@ -57,17 +49,17 @@ public class KeyGenerationService {
                     combinedEntropy.toCharArray(),
                     salt,
                     iterations,
-                    KEY_LENGTH_BITS
+                    CryptoConstants.MASTER_KEY_BITS
             );
 
-            SecretKeyFactory factory = SecretKeyFactory.getInstance(PBKDF2_ALGORITHM);
+            SecretKeyFactory factory = SecretKeyFactory.getInstance(CryptoConstants.KDF_ALGORITHM);
             byte[] keyBytes = factory.generateSecret(spec).getEncoded();
 
             // Clear the spec
             spec.clearPassword();
 
             // Calculate key fingerprint (SHA-256 hash of key)
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance(CryptoConstants.HASH_ALGORITHM);
             byte[] fingerprintBytes = digest.digest(keyBytes);
             String fingerprint = formatFingerprint(fingerprintBytes);
 
@@ -98,8 +90,8 @@ public class KeyGenerationService {
      */
     public byte[] generateRandomMasterKey() {
         try {
-            KeyGenerator keyGen = KeyGenerator.getInstance(AES_ALGORITHM);
-            keyGen.init(KEY_LENGTH_BITS, secureRandom);
+            KeyGenerator keyGen = KeyGenerator.getInstance(CryptoConstants.MASTER_KEY_ALGORITHM);
+            keyGen.init(CryptoConstants.MASTER_KEY_BITS, secureRandom);
             SecretKey secretKey = keyGen.generateKey();
             return secretKey.getEncoded();
         } catch (Exception e) {
@@ -112,7 +104,7 @@ public class KeyGenerationService {
      * Generates a cryptographically secure salt for PBKDF2.
      */
     public byte[] generateSalt() {
-        byte[] salt = new byte[32]; // 256 bits
+        byte[] salt = new byte[CryptoConstants.KDF_SALT_BYTES];
         secureRandom.nextBytes(salt);
         return salt;
     }
@@ -210,14 +202,14 @@ public class KeyGenerationService {
             byte[] secretBytes = secret.toByteArray();
 
             // Remove leading zero byte if present (BigInteger adds it for positive numbers)
-            if (secretBytes.length > KEY_LENGTH_BYTES && secretBytes[0] == 0) {
+            if (secretBytes.length > CryptoConstants.MASTER_KEY_BYTES && secretBytes[0] == 0) {
                 secretBytes = Arrays.copyOfRange(secretBytes, 1, secretBytes.length);
             }
 
             // Pad with leading zeros if necessary
-            if (secretBytes.length < KEY_LENGTH_BYTES) {
-                byte[] paddedBytes = new byte[KEY_LENGTH_BYTES];
-                System.arraycopy(secretBytes, 0, paddedBytes, KEY_LENGTH_BYTES - secretBytes.length, secretBytes.length);
+            if (secretBytes.length < CryptoConstants.MASTER_KEY_BYTES) {
+                byte[] paddedBytes = new byte[CryptoConstants.MASTER_KEY_BYTES];
+                System.arraycopy(secretBytes, 0, paddedBytes, CryptoConstants.MASTER_KEY_BYTES - secretBytes.length, secretBytes.length);
                 secretBytes = paddedBytes;
             }
 
@@ -239,13 +231,13 @@ public class KeyGenerationService {
             byte[] shareBytes = serializeShare(share);
 
             // Generate random IV
-            byte[] iv = new byte[GCM_IV_LENGTH];
+            byte[] iv = new byte[CryptoConstants.GCM_IV_BYTES];
             secureRandom.nextBytes(iv);
 
             // Create cipher
-            Cipher cipher = Cipher.getInstance(AES_CIPHER_MODE);
-            SecretKeySpec keySpec = new SecretKeySpec(encryptionKey, AES_ALGORITHM);
-            GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            Cipher cipher = Cipher.getInstance(CryptoConstants.SHARE_CIPHER);
+            SecretKeySpec keySpec = new SecretKeySpec(encryptionKey, CryptoConstants.MASTER_KEY_ALGORITHM);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(CryptoConstants.GCM_TAG_BITS, iv);
 
             cipher.init(Cipher.ENCRYPT_MODE, keySpec, gcmSpec);
 
@@ -271,13 +263,13 @@ public class KeyGenerationService {
     public ShamirShare decryptShare(byte[] encryptedData, byte[] encryptionKey) {
         try {
             // Extract IV and encrypted data
-            byte[] iv = Arrays.copyOfRange(encryptedData, 0, GCM_IV_LENGTH);
-            byte[] encrypted = Arrays.copyOfRange(encryptedData, GCM_IV_LENGTH, encryptedData.length);
+            byte[] iv = Arrays.copyOfRange(encryptedData, 0, CryptoConstants.GCM_IV_BYTES);
+            byte[] encrypted = Arrays.copyOfRange(encryptedData, CryptoConstants.GCM_IV_BYTES, encryptedData.length);
 
             // Create cipher
-            Cipher cipher = Cipher.getInstance(AES_CIPHER_MODE);
-            SecretKeySpec keySpec = new SecretKeySpec(encryptionKey, AES_ALGORITHM);
-            GCMParameterSpec gcmSpec = new GCMParameterSpec(GCM_TAG_LENGTH, iv);
+            Cipher cipher = Cipher.getInstance(CryptoConstants.SHARE_CIPHER);
+            SecretKeySpec keySpec = new SecretKeySpec(encryptionKey, CryptoConstants.MASTER_KEY_ALGORITHM);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(CryptoConstants.GCM_TAG_BITS, iv);
 
             cipher.init(Cipher.DECRYPT_MODE, keySpec, gcmSpec);
 
@@ -298,13 +290,71 @@ public class KeyGenerationService {
      */
     public String generateShareVerificationHash(byte[] shareData) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            MessageDigest digest = MessageDigest.getInstance(CryptoConstants.HASH_ALGORITHM);
             byte[] hash = digest.digest(shareData);
             return bytesToHex(hash);
         } catch (Exception e) {
             log.error("Error generating share verification hash", e);
             throw new RuntimeException("Failed to generate verification hash", e);
         }
+    }
+
+    /**
+     * Derives an operational key from a master key using PBKDF2.
+     * This replaces key truncation with cryptographic derivation.
+     *
+     * @param masterKey The full master key (256-bit)
+     * @param context Context string (e.g., "TPK:BANK-001:TERM-ATM-123")
+     * @param outputBytes Desired key length (16 for AES-128, 32 for AES-256)
+     * @return Derived key of specified length
+     */
+    public byte[] deriveOperationalKey(byte[] masterKey, String context, int outputBytes) {
+        try {
+            log.debug("Deriving {}-byte operational key with context: {}", outputBytes, context);
+
+            // Convert master key to hex string for PBKDF2 password
+            String password = bytesToHex(masterKey);
+
+            // Use context as salt (includes key type, bank ID, terminal ID, etc.)
+            byte[] salt = context.getBytes(StandardCharsets.UTF_8);
+
+            // Use same PBKDF2 parameters as master key generation
+            SecretKeyFactory factory = SecretKeyFactory.getInstance(CryptoConstants.KDF_ALGORITHM);
+            PBEKeySpec spec = new PBEKeySpec(
+                password.toCharArray(),
+                salt,
+                CryptoConstants.KDF_ITERATIONS,
+                outputBytes * 8  // Convert bytes to bits
+            );
+
+            byte[] derivedKey = factory.generateSecret(spec).getEncoded();
+
+            // Clear sensitive data
+            spec.clearPassword();
+
+            log.debug("Successfully derived {}-byte key (fingerprint: {})",
+                     outputBytes,
+                     bytesToHex(Arrays.copyOf(derivedKey, 4)));
+
+            return derivedKey;
+
+        } catch (Exception e) {
+            log.error("Failed to derive operational key for context: {}", context, e);
+            throw new RuntimeException("Key derivation failed", e);
+        }
+    }
+
+    /**
+     * Builds a context string for key derivation.
+     * Format: "KEY_TYPE:BANK_ID:IDENTIFIER"
+     *
+     * @param keyType Key type (TPK, TSK, ZPK, etc.)
+     * @param bankId Bank identifier
+     * @param identifier Terminal ID, zone ID, or other unique identifier
+     * @return Context string for derivation
+     */
+    public String buildKeyContext(String keyType, String bankId, String identifier) {
+        return String.join(CryptoConstants.CONTEXT_SEPARATOR, keyType, bankId, identifier);
     }
 
     // ===== Private Helper Methods =====

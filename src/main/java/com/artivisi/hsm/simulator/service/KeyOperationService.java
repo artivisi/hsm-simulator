@@ -51,7 +51,7 @@ public class KeyOperationService {
                 .keyType(KeyType.TMK)
                 .algorithm("AES")
                 .keySize(keySize)
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .combinedEntropyHash(generateEntropyHash(keyData))
@@ -82,7 +82,7 @@ public class KeyOperationService {
             throw new IllegalArgumentException("Parent key must be TMK, got: " + tmk.getKeyType());
         }
 
-        byte[] keyData = deriveKeyFromParent(tmk.getKeyDataEncrypted(), "TPK", terminal.getTerminalId());
+        byte[] keyData = deriveKeyFromParent(tmk.getKeyData(), "TPK", terminal.getTerminalId());
         String masterKeyId = generateKeyId("TPK", terminal.getTerminalId());
 
         MasterKey tpk = MasterKey.builder()
@@ -91,7 +91,7 @@ public class KeyOperationService {
                 .keyType(KeyType.TPK)
                 .algorithm("AES")
                 .keySize(tmk.getKeySize())
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .combinedEntropyHash(generateEntropyHash(keyData))
@@ -122,7 +122,7 @@ public class KeyOperationService {
             throw new IllegalArgumentException("Parent key must be TMK, got: " + tmk.getKeyType());
         }
 
-        byte[] keyData = deriveKeyFromParent(tmk.getKeyDataEncrypted(), "TSK", terminal.getTerminalId());
+        byte[] keyData = deriveKeyFromParent(tmk.getKeyData(), "TSK", terminal.getTerminalId());
         String masterKeyId = generateKeyId("TSK", terminal.getTerminalId());
 
         MasterKey tsk = MasterKey.builder()
@@ -131,7 +131,7 @@ public class KeyOperationService {
                 .keyType(KeyType.TSK)
                 .algorithm("AES")
                 .keySize(tmk.getKeySize())
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .combinedEntropyHash(generateEntropyHash(keyData))
@@ -163,7 +163,7 @@ public class KeyOperationService {
                 .keyType(KeyType.ZMK)
                 .algorithm("AES")
                 .keySize(keySize)
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .combinedEntropyHash(generateEntropyHash(keyData))
@@ -191,7 +191,7 @@ public class KeyOperationService {
             throw new IllegalArgumentException("Parent key must be ZMK, got: " + zmk.getKeyType());
         }
 
-        byte[] keyData = deriveKeyFromParent(zmk.getKeyDataEncrypted(), "ZPK", zoneIdentifier);
+        byte[] keyData = deriveKeyFromParent(zmk.getKeyData(), "ZPK", zoneIdentifier);
         String masterKeyId = generateKeyId("ZPK", zoneIdentifier);
 
         MasterKey zpk = MasterKey.builder()
@@ -200,7 +200,7 @@ public class KeyOperationService {
                 .keyType(KeyType.ZPK)
                 .algorithm("AES")
                 .keySize(zmk.getKeySize())
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .combinedEntropyHash(generateEntropyHash(keyData))
@@ -228,7 +228,7 @@ public class KeyOperationService {
             throw new IllegalArgumentException("Parent key must be ZMK, got: " + zmk.getKeyType());
         }
 
-        byte[] keyData = deriveKeyFromParent(zmk.getKeyDataEncrypted(), "ZSK", zoneIdentifier);
+        byte[] keyData = deriveKeyFromParent(zmk.getKeyData(), "ZSK", zoneIdentifier);
         String masterKeyId = generateKeyId("ZSK", zoneIdentifier);
 
         MasterKey zsk = MasterKey.builder()
@@ -237,7 +237,7 @@ public class KeyOperationService {
                 .keyType(KeyType.ZSK)
                 .algorithm("AES")
                 .keySize(zmk.getKeySize())
-                .keyDataEncrypted(keyData)
+                .keyData(keyData)
                 .keyFingerprint(generateFingerprint(keyData))
                 .keyChecksum(generateChecksum(keyData))
                 .combinedEntropyHash(generateEntropyHash(keyData))
@@ -334,11 +334,11 @@ public class KeyOperationService {
     }
 
     /**
-     * Generate MD5 checksum
+     * Generate SHA-256 checksum (replaces MD5 for security)
      */
     private String generateChecksum(byte[] keyData) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("MD5");
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(keyData);
             return bytesToHex(hash);
         } catch (NoSuchAlgorithmException e) {
@@ -373,6 +373,6 @@ public class KeyOperationService {
         MasterKey key = masterKeyRepository.findById(keyId)
                 .orElseThrow(() -> new IllegalArgumentException("Key not found: " + keyId));
 
-        return bytesToHex(key.getKeyDataEncrypted());
+        return bytesToHex(key.getKeyData());
     }
 }

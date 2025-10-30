@@ -124,15 +124,38 @@ INSERT INTO users (username, email, password, full_name, role, active) VALUES
 -- Sample Master Keys
 -- Purpose: Create sample keys for testing PIN operations
 -- ============================================================================
+--
+-- ⚠️ WARNING: EDUCATIONAL SAMPLE KEYS ONLY - DO NOT USE IN PRODUCTION! ⚠️
+--
+-- These are HARDCODED sample keys for educational and testing purposes.
+-- The key material is intentionally simple (0123456789ABCDEF pattern).
+--
+-- In a PRODUCTION environment, keys should be generated using:
+-- 1. Key Ceremony (KeyCeremonyService) with Shamir Secret Sharing
+-- 2. Secure Random Generation (KeyGenerationService.generateRandomMasterKey())
+-- 3. PBKDF2 Key Derivation (KeyGenerationService.deriveMasterKey())
+--
+-- Production keys use:
+-- - AES-256-GCM for encryption (with random IV)
+-- - PBKDF2-SHA256 for key derivation (100,000 iterations, unique salt)
+-- - SHA-256 for fingerprints and checksums (no MD5)
+-- - Context-based derivation for operational keys (no truncation)
+--
+-- Operational keys (PIN, MAC, KEK) are DERIVED from master keys using:
+--   KeyGenerationService.deriveOperationalKey(masterKey, context, keySize)
+-- Where context = "KEY_TYPE:BANK_ID:TERMINAL_ID"
+--
+-- ============================================================================
 
--- Sample LMK (Local Master Key) for PIN encryption
--- This is a test key for demonstration purposes only
+-- Sample LMK (Local Master Key) for PIN storage encryption
+-- Used for encrypting PINs at rest in the database
+-- In production: Generated via Key Ceremony or Secure Random
 INSERT INTO master_keys (
     master_key_id,
     key_type,
     algorithm,
     key_size,
-    key_data_encrypted,
+    key_data,
     key_fingerprint,
     key_checksum,
     generation_method,
@@ -157,14 +180,15 @@ INSERT INTO master_keys (
     CURRENT_TIMESTAMP
 );
 
--- Sample TPK (Terminal PIN Key) for terminal PIN encryption
--- This is a test key for demonstration purposes only
+-- Sample TPK (Terminal PIN Key) master key for terminal PIN encryption
+-- Operational 128-bit PIN keys are DERIVED from this using context
+-- In production: Generated via Key Ceremony and linked to TMK parent
 INSERT INTO master_keys (
     master_key_id,
     key_type,
     algorithm,
     key_size,
-    key_data_encrypted,
+    key_data,
     key_fingerprint,
     key_checksum,
     generation_method,

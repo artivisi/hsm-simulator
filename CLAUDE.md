@@ -181,10 +181,59 @@ Configured in `src/main/resources/application.properties`:
 2. Update corresponding JPA entities
 3. Test with `mvn clean install` to ensure migration runs successfully
 
+## Cryptographic Standards
+
+### Master Key Storage
+- **Algorithm**: AES-256
+- **Mode**: GCM with random IV for key wrapping/share encryption
+- **Fingerprints**: SHA-256 (not MD5)
+- **Checksums**: SHA-256 derived (not MD5)
+
+### Operational Key Derivation
+- **Method**: PBKDF2-SHA256 with context
+- **Iterations**: 100,000
+- **Context Format**: `"KEY_TYPE:BANK_ID:IDENTIFIER"`
+- **Key Sizes**:
+  - PIN operations: 128-bit (16 bytes)
+  - MAC operations: 128-bit or 256-bit
+  - Zone operations: 256-bit (32 bytes)
+- **No Truncation**: Keys are properly derived, not truncated from master keys
+
+### PIN Operations
+- **Encryption**: AES-128-CBC with random IV and PKCS5 padding
+- **IV Handling**: Random 16-byte IV prepended to ciphertext
+- **PIN Formats**: ISO-0, ISO-1, ISO-3, ISO-4 (ISO 9564-1:2002)
+- **PVV Calculation**: SHA-256(PIN + PAN), first 4 decimal digits
+
+### MAC Operations
+- **Default Algorithm**: AES-CMAC (NIST SP 800-38B)
+- **Output Lengths**: 64-bit (banking standard), 128-bit, 256-bit
+- **Alternative**: HMAC-SHA256 with configurable output
+- **Key Derivation**: Context-based PBKDF2 from TSK/ZSK master keys
+
+### Share Encryption (Key Ceremony)
+- **Algorithm**: AES-256-GCM
+- **Salt**: Random 32-byte salt per share (not fixed)
+- **Salt Storage**: Prepended to encrypted share data for offline recovery
+- **Format**: `[32-byte salt][encrypted share data]`
+
+### Key Hierarchy
+```
+Master Keys (AES-256) → Operational Keys (PBKDF2-derived)
+  ├─ LMK → PIN Storage Keys (AES-128)
+  ├─ TMK → TPK/TSK (AES-128)
+  └─ ZMK → ZPK/ZSK (AES-256)
+```
+
+### Key Caching
+- Derived operational keys cached in ConcurrentHashMap
+- Cache key format: `keyId:context`
+- Avoids re-derivation overhead for repeated operations
+
 ## Security Notes
 
 This is an educational simulator, not for production use:
 - Database credentials are in plaintext configuration
-- No authentication/authorization implemented
-- Cryptographic operations are simplified simulations
-- No hardware security boundary enforcement
+- Clear PINs stored for educational purposes (never in production)
+- Cryptographic operations follow banking standards but lack hardware security boundary
+- Key material stored in software (production HSM uses hardware protection)

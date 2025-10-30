@@ -81,7 +81,7 @@ public class MacController {
     public ResponseEntity<?> generateMac(
             @RequestParam UUID keyId,
             @RequestParam String message,
-            @RequestParam(defaultValue = "ISO9797-ALG3") String algorithm,
+            @RequestParam(defaultValue = "AES-CMAC") String algorithm,
             Principal principal
     ) {
         log.info("User {} generating MAC for message length {}", principal.getName(), message.length());
@@ -136,7 +136,7 @@ public class MacController {
             @RequestParam String message,
             @RequestParam String mac,
             @RequestParam UUID keyId,
-            @RequestParam(defaultValue = "ISO9797-ALG3") String algorithm,
+            @RequestParam(defaultValue = "AES-CMAC") String algorithm,
             Principal principal
     ) {
         log.info("User {} verifying MAC for message length {}", principal.getName(), message.length());

@@ -1,5 +1,6 @@
 package com.artivisi.hsm.simulator.web;
 
+import com.artivisi.hsm.simulator.config.CryptoConstants;
 import com.artivisi.hsm.simulator.dto.KeyExchangeRequest;
 import com.artivisi.hsm.simulator.dto.KeyExchangeResponse;
 import com.artivisi.hsm.simulator.dto.PinEncryptRequest;
@@ -8,6 +9,7 @@ import com.artivisi.hsm.simulator.entity.GeneratedPin;
 import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
+import com.artivisi.hsm.simulator.service.KeyGenerationService;
 import com.artivisi.hsm.simulator.service.KeyInitializationService;
 import com.artivisi.hsm.simulator.service.KeyOperationService;
 import com.artivisi.hsm.simulator.service.MacService;
@@ -17,6 +19,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import javax.crypto.Cipher;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import java.security.SecureRandom;
 import java.util.Map;
 import java.util.UUID;
 
@@ -34,7 +40,9 @@ public class HsmApiController {
     private final MacService macService;
     private final KeyOperationService keyOperationService;
     private final KeyInitializationService keyInitializationService;
+    private final KeyGenerationService keyGenerationService;
     private final MasterKeyRepository masterKeyRepository;
+    private final SecureRandom secureRandom = new SecureRandom();
 
     /**
      * POST /api/hsm/pin/encrypt
@@ -582,7 +590,7 @@ public class HsmApiController {
         try {
             UUID keyId = UUID.fromString(request.get("keyId"));
             String message = request.get("message");
-            String algorithm = request.getOrDefault("algorithm", "ISO9797-ALG3");
+            String algorithm = request.getOrDefault("algorithm", "AES-CMAC");
 
             var generatedMac = macService.generateMac(keyId, message, algorithm);
 
@@ -611,7 +619,7 @@ public class HsmApiController {
             UUID keyId = UUID.fromString(request.get("keyId"));
             String message = request.get("message");
             String mac = request.get("mac");
-            String algorithm = request.getOrDefault("algorithm", "ISO9797-ALG3");
+            String algorithm = request.getOrDefault("algorithm", "AES-CMAC");
 
             boolean isValid = macService.verifyMac(message, mac, keyId, algorithm);
 
@@ -742,27 +750,55 @@ public class HsmApiController {
 
     private String encryptKeyUnderKey(byte[] keyToEncrypt, MasterKey encryptingKey) {
         try {
-            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/ECB/NoPadding");
-            byte[] keyBytes = new byte[16];
-            System.arraycopy(encryptingKey.getKeyDataEncrypted(), 0, keyBytes, 0,
-                    Math.min(16, encryptingKey.getKeyDataEncrypted().length));
-            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(keyBytes, "AES");
-            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey);
+            // Derive KEK (Key Encryption Key) using context
+            String context = keyGenerationService.buildKeyContext(
+                encryptingKey.getKeyType().toString(),
+                encryptingKey.getIdBank() != null ? encryptingKey.getIdBank().toString() : "GLOBAL",
+                "KEK"
+            );
+
+            byte[] kekBytes = keyGenerationService.deriveOperationalKey(
+                encryptingKey.getKeyData(),
+                context,
+                CryptoConstants.ZONE_KEY_BYTES  // 32 bytes for AES-256
+            );
+
+            // Use AES-256 GCM mode for secure key wrapping
+            Cipher cipher = Cipher.getInstance(CryptoConstants.KEK_CIPHER);
+            SecretKeySpec secretKey = new SecretKeySpec(kekBytes, CryptoConstants.MASTER_KEY_ALGORITHM);
+
+            // Generate random IV for GCM
+            byte[] iv = new byte[CryptoConstants.GCM_IV_BYTES];
+            secureRandom.nextBytes(iv);
+            GCMParameterSpec gcmSpec = new GCMParameterSpec(CryptoConstants.GCM_TAG_BITS, iv);
+
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey, gcmSpec);
+
+            // Encrypt the key
             byte[] encrypted = cipher.doFinal(keyToEncrypt);
-            return bytesToHex(encrypted);
+
+            // Prepend IV to encrypted data (IV:ciphertext)
+            byte[] result = new byte[iv.length + encrypted.length];
+            System.arraycopy(iv, 0, result, 0, iv.length);
+            System.arraycopy(encrypted, 0, result, iv.length, encrypted.length);
+
+            return bytesToHex(result);
         } catch (Exception e) {
+            log.error("Failed to encrypt key under key", e);
             throw new RuntimeException("Failed to encrypt key", e);
         }
     }
 
     private String calculateKeyCheckValue(byte[] key) {
         try {
-            javax.crypto.Cipher cipher = javax.crypto.Cipher.getInstance("AES/ECB/NoPadding");
-            javax.crypto.spec.SecretKeySpec secretKey = new javax.crypto.spec.SecretKeySpec(key, "AES");
-            cipher.init(javax.crypto.Cipher.ENCRYPT_MODE, secretKey);
+            // KCV uses ECB mode with zeros - this is standard practice
+            Cipher cipher = Cipher.getInstance("AES/ECB/NoPadding");
+            SecretKeySpec secretKey = new SecretKeySpec(key, CryptoConstants.MASTER_KEY_ALGORITHM);
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey);
             byte[] encrypted = cipher.doFinal(new byte[16]); // Encrypt zeros
-            return bytesToHex(encrypted).substring(0, 6); // First 6 hex chars
+            return bytesToHex(encrypted).substring(0, CryptoConstants.KCV_HEX_LENGTH);
         } catch (Exception e) {
+            log.error("Failed to calculate KCV", e);
             throw new RuntimeException("Failed to calculate KCV", e);
         }
     }

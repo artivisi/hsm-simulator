@@ -252,7 +252,7 @@ public class CeremonyService {
                     .keyType(KeyType.LMK)
                     .algorithm(ceremony.getAlgorithm())
                     .keySize(ceremony.getKeySize())
-                    .keyDataEncrypted(keyResult.getKeyData()) // In production, encrypt this
+                    .keyData(keyResult.getKeyData()) // Plaintext key material for educational purposes
                     .keyFingerprint(keyResult.getFingerprint())
                     .keyChecksum(keyResult.getChecksum())
                     .combinedEntropyHash(keyResult.getCombinedEntropyHash())
@@ -295,14 +295,23 @@ public class CeremonyService {
                     throw new IllegalArgumentException("Invalid passphrase for custodian: " + custodianEmail);
                 }
 
-                // Derive encryption key from passphrase
-                byte[] encryptionKey = deriveEncryptionKeyFromPassphrase(passphrase);
+                // Generate random salt for this share
+                byte[] shareSalt = keyGenerationService.generateSalt();
+
+                // Derive encryption key from passphrase + salt
+                byte[] encryptionKey = deriveEncryptionKeyFromPassphrase(passphrase, shareSalt);
 
                 // Encrypt the share
                 byte[] encryptedShareData = keyGenerationService.encryptShare(shamirShare, encryptionKey);
 
+                // Prepend salt to encrypted data for offline recovery
+                // Format: [32-byte salt][encrypted share data]
+                byte[] shareDataWithSalt = new byte[shareSalt.length + encryptedShareData.length];
+                System.arraycopy(shareSalt, 0, shareDataWithSalt, 0, shareSalt.length);
+                System.arraycopy(encryptedShareData, 0, shareDataWithSalt, shareSalt.length, encryptedShareData.length);
+
                 // Calculate verification hash
-                String verificationHash = keyGenerationService.generateShareVerificationHash(encryptedShareData);
+                String verificationHash = keyGenerationService.generateShareVerificationHash(shareDataWithSalt);
 
                 String shareId = generateShareId(ceremony, ceremonyCustodian);
 
@@ -311,7 +320,7 @@ public class CeremonyService {
                         .masterKey(masterKey)
                         .ceremonyCustodian(ceremonyCustodian)
                         .shareIndex(shamirShare.getShareIndex())
-                        .shareDataEncrypted(encryptedShareData)
+                        .shareDataEncrypted(shareDataWithSalt)  // Store with salt prepended
                         .shareVerificationHash(verificationHash)
                         .polynomialDegree(ceremony.getThreshold() - 1)
                         .primeModulus(shamirShare.getPrime().toString(16))
@@ -487,12 +496,10 @@ public class CeremonyService {
 
     /**
      * Derives encryption key from custodian passphrase using PBKDF2
+     * @param passphrase The custodian's passphrase
+     * @param salt Random salt (will be stored with encrypted share for offline recovery)
      */
-    private byte[] deriveEncryptionKeyFromPassphrase(String passphrase) {
-        // Use a fixed salt for passphrase-based encryption
-        // This allows offline recovery with only the passphrase
-        byte[] salt = "HSM_SHARE_ENCRYPTION_SALT_V1".getBytes(java.nio.charset.StandardCharsets.UTF_8);
-
+    private byte[] deriveEncryptionKeyFromPassphrase(String passphrase, byte[] salt) {
         try {
             javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
             javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(passphrase.toCharArray(), salt, 100000, 256);

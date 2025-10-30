@@ -671,12 +671,16 @@ Generates Message Authentication Code for message integrity.
 **Request Parameters**:
 - `message` (string, required): Message to authenticate
 - `keyId` (string, required): UUID of MAC key (TSK or ZSK)
-- `algorithm` (string, optional): MAC algorithm, defaults to `ISO9797-ALG3`
+- `algorithm` (string, optional): MAC algorithm, defaults to `AES-CMAC`
 
 **Supported Algorithms**:
-- `ISO9797-ALG3` - Retail MAC (ISO 9797-1 Algorithm 3, compatible with ANSI X9.19)
-- `HMAC-SHA256` - HMAC with SHA-256
-- `CBC-MAC` - DES-based CBC-MAC
+- `AES-CMAC` - AES-CMAC with 64-bit output (NIST SP 800-38B, banking standard)
+- `AES-CMAC-128` - AES-CMAC with 128-bit output (full MAC)
+- `AES-CMAC-256` - AES-CMAC with 256-bit output (double key size)
+- `AES-CMAC-64` - AES-CMAC with 64-bit output (explicit, same as AES-CMAC)
+- `HMAC-SHA256` - HMAC with SHA-256, 64-bit output (banking compatible)
+- `HMAC-SHA256-FULL` - HMAC with SHA-256, 256-bit output (full hash)
+- `HMAC-SHA256-64` - HMAC with SHA-256, 64-bit output (explicit)
 
 **Response**:
 ```json
@@ -688,7 +692,7 @@ Generates Message Authentication Code for message integrity.
 ```
 
 **Response Fields**:
-- `macValue` (string): 16-character hexadecimal MAC value
+- `macValue` (string): Hexadecimal MAC value (16 chars for 64-bit, 32 chars for 128-bit, 64 chars for 256-bit)
 - `algorithm` (string): Algorithm used
 - `messageLength` (integer): Message length in bytes
 
@@ -700,7 +704,7 @@ curl -X POST http://localhost:8080/api/hsm/mac/generate \
   -d '{
     "message": "0800822000000000000004000000000000000000001234567890123456",
     "keyId": "223e4567-e89b-12d3-a456-426614174000",
-    "algorithm": "ISO9797-ALG3"
+    "algorithm": "AES-CMAC"
   }'
 ```
 
@@ -724,9 +728,9 @@ Verifies MAC authenticity for received message.
 
 **Request Parameters**:
 - `message` (string, required): Original message
-- `mac` (string, required): MAC value to verify (16 hex characters)
+- `mac` (string, required): MAC value to verify (16, 32, or 64 hex characters depending on algorithm)
 - `keyId` (string, required): UUID of MAC key (same key used for generation)
-- `algorithm` (string, optional): MAC algorithm, defaults to `ISO9797-ALG3`
+- `algorithm` (string, optional): MAC algorithm, defaults to `AES-CMAC`
 
 **Response**:
 ```json
@@ -749,7 +753,7 @@ curl -X POST http://localhost:8080/api/hsm/mac/verify \
     "message": "0800822000000000000004000000000000000000001234567890123456",
     "mac": "A1B2C3D4E5F6G7H8",
     "keyId": "223e4567-e89b-12d3-a456-426614174000",
-    "algorithm": "ISO9797-ALG3"
+    "algorithm": "AES-CMAC"
   }'
 ```
 
@@ -931,14 +935,14 @@ curl -X POST http://localhost:8080/api/hsm/keys/initialize \
 # 4. Done! Both banks can now communicate
 # - Issuer encrypts PIN with ZPK-ISS001-GHI789
 # - Acquirer decrypts with ZPK-ACQ001-SHARED-VWX234
-# - Works because both have identical key_data_encrypted
+# - Works because both have identical key_data
 ```
 
 **Key Points**:
 - 🔑 **Each bank gets its own LMK**: `LMK-ISS001-ABC123` ≠ `LMK-ACQ001-PQR678`
   - Same PIN encrypted with different LMKs produces **different ciphertexts**
   - Banks cannot decrypt each other's stored PINs
-- 🔐 **Zone keys are shared**: Different IDs but **identical key material** (same `key_data_encrypted` bytes)
+- 🔐 **Zone keys are shared**: Different IDs but **identical key material** (same `key_data` bytes)
   - `ZPK-ISS001-JKL012` and `ZPK-ACQ001-SHARED-YZA567` can decrypt each other's data
 - 🔄 **Regeneration**: Running initialize again with `clearExisting=true` regenerates that bank's keys with new random values
 - ⚠️ **Key sync**: To regenerate ISS001's keys, re-run step 2, then re-run step 3 to update ACQ001's shared zone keys
@@ -971,7 +975,7 @@ curl -X POST http://localhost:8080/api/hsm/keys/initialize \
 
 # 3. Export zone keys from Issuer database
 psql -h localhost -U hsm_user hsm_issuer \
-  -c "SELECT master_key_id, key_type, encode(key_data_encrypted, 'hex') as key_hex
+  -c "SELECT master_key_id, key_type, encode(key_data, 'hex') as key_hex
       FROM master_keys
       WHERE key_type IN ('ZMK', 'ZPK', 'ZSK')
         AND id_bank = (SELECT id FROM banks WHERE bank_code = 'ISS001');"
@@ -1235,7 +1239,7 @@ For each terminal in the system, the following keys are created:
 ```sql
 -- 1. Export zone keys from Issuer HSM database
 SELECT id, master_key_id, key_type, algorithm, key_size,
-       encode(key_data_encrypted, 'hex') as key_hex,
+       encode(key_data, 'hex') as key_hex,
        key_fingerprint, key_checksum, id_bank
 FROM master_keys
 WHERE key_type IN ('ZMK', 'ZPK', 'ZSK')
@@ -1243,11 +1247,11 @@ WHERE key_type IN ('ZMK', 'ZPK', 'ZSK')
 
 -- 2. Insert into Acquirer HSM database
 -- Replace the acquirer's zone keys with issuer's zone keys
--- Keep same key_data_encrypted (hex decoded)
+-- Keep same key_data (hex decoded)
 -- Update id_bank to point to acquirer's bank
 INSERT INTO master_keys (
     master_key_id, key_type, algorithm, key_size,
-    key_data_encrypted, key_fingerprint, key_checksum,
+    key_data, key_fingerprint, key_checksum,
     id_bank, generation_method, kdf_iterations, kdf_salt,
     status, activated_at
 ) VALUES (
@@ -1286,7 +1290,7 @@ curl -X POST http://acquirer-hsm:8081/api/hsm/keys/import/zone \
 - This is the ISO 11568-4 standard approach
 
 **Key Point**: For your multi-HSM simulator testing, **Option 1 (manual database copy)** is the fastest approach. Just ensure:
-- Both HSMs have the **same** `key_data_encrypted` value for zone keys
+- Both HSMs have the **same** `key_data` value for zone keys
 - Each HSM still has its **own** LMK, TMK, TPK, TSK (these should be different)
 
 ### Key Usage Scenarios
@@ -1548,13 +1552,13 @@ curl -X POST http://localhost:8080/api/hsm/pin/encrypt \
 curl -X POST http://localhost:8080/api/hsm/mac/generate \
   -H "Content-Type: application/json" \
   -u admin:admin \
-  -d '{"message":"Test message","keyId":"YOUR-KEY-ID","algorithm":"ISO9797-ALG3"}'
+  -d '{"message":"Test message","keyId":"YOUR-KEY-ID","algorithm":"AES-CMAC"}'
 
 # Verify MAC
 curl -X POST http://localhost:8080/api/hsm/mac/verify \
   -H "Content-Type: application/json" \
   -u admin:admin \
-  -d '{"message":"Test message","mac":"YOUR-MAC-VALUE","keyId":"YOUR-KEY-ID","algorithm":"ISO9797-ALG3"}'
+  -d '{"message":"Test message","mac":"YOUR-MAC-VALUE","keyId":"YOUR-KEY-ID","algorithm":"AES-CMAC"}'
 ```
 
 ### Using Postman

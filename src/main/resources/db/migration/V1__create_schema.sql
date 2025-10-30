@@ -180,7 +180,7 @@ CREATE TABLE master_keys (
     key_usage VARCHAR(50), -- PIN_ENCRYPTION, DATA_ENCRYPTION, KEY_ENCRYPTION, MAC_GENERATION
     algorithm VARCHAR(50) NOT NULL,
     key_size INTEGER NOT NULL,
-    key_data_encrypted BYTEA NOT NULL, -- Encrypted master key
+    key_data BYTEA NOT NULL, -- Master key material (plaintext for educational purposes)
     key_fingerprint VARCHAR(255) NOT NULL,
     key_checksum VARCHAR(255) NOT NULL,
     combined_entropy_hash VARCHAR(255),

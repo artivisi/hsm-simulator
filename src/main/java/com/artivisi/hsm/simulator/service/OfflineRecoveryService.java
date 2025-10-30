@@ -130,12 +130,20 @@ public class OfflineRecoveryService {
         // provides better verification and follows best security practices
         List<KeyGenerationService.ShamirShare> shamirShares = new ArrayList<>();
         for (ShareWithPassphrase swp : sharesWithPassphrases) {
-            // Derive the encryption key from passphrase
-            byte[] encryptionKey = deriveEncryptionKeyFromPassphrase(swp.getPassphrase());
+            // Extract salt from encrypted share data
+            // Format: [32-byte salt][encrypted share data]
+            byte[] shareDataWithSalt = swp.getShare().getEncryptedShareData();
+            byte[] salt = new byte[32];  // CryptoConstants.KDF_SALT_BYTES
+            byte[] encryptedShareData = new byte[shareDataWithSalt.length - 32];
+            System.arraycopy(shareDataWithSalt, 0, salt, 0, 32);
+            System.arraycopy(shareDataWithSalt, 32, encryptedShareData, 0, encryptedShareData.length);
+
+            // Derive the encryption key from passphrase + extracted salt
+            byte[] encryptionKey = deriveEncryptionKeyFromPassphrase(swp.getPassphrase(), salt);
 
             // Decrypt the share
             KeyGenerationService.ShamirShare shamirShare = keyGenerationService.decryptShare(
-                    swp.getShare().getEncryptedShareData(),
+                    encryptedShareData,
                     encryptionKey
             );
             shamirShares.add(shamirShare);
@@ -214,12 +222,10 @@ public class OfflineRecoveryService {
     /**
      * Derives encryption key from custodian passphrase using PBKDF2
      * Must match the logic in CeremonyService.deriveEncryptionKeyFromPassphrase()
+     * @param passphrase The custodian's passphrase
+     * @param salt Random salt extracted from encrypted share data
      */
-    private byte[] deriveEncryptionKeyFromPassphrase(String passphrase) {
-        // Use a fixed salt for passphrase-based encryption
-        // This allows offline recovery with only the passphrase
-        byte[] salt = "HSM_SHARE_ENCRYPTION_SALT_V1".getBytes(StandardCharsets.UTF_8);
-
+    private byte[] deriveEncryptionKeyFromPassphrase(String passphrase, byte[] salt) {
         try {
             SecretKeyFactory factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
             PBEKeySpec spec = new PBEKeySpec(passphrase.toCharArray(), salt, 100000, 256);
@@ -279,7 +285,7 @@ public class OfflineRecoveryService {
                 .keyType(KeyType.LMK)
                 .algorithm("AES")
                 .keySize(256)
-                .keyDataEncrypted(recoveryResult.getReconstructedKey())
+                .keyData(recoveryResult.getReconstructedKey())
                 .keyFingerprint(recoveryResult.getReconstructedFingerprint())
                 .keyChecksum(calculateChecksum(recoveryResult.getReconstructedKey()))
                 .combinedEntropyHash("RECOVERED_KEY_NO_ENTROPY_HASH") // Placeholder for recovered keys
