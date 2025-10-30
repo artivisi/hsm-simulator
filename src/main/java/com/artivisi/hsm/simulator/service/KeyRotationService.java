@@ -36,6 +36,95 @@ public class KeyRotationService {
     private final SecureRandom secureRandom = new SecureRandom();
 
     /**
+     * Terminal-initiated key rotation (auto-approved).
+     * Terminal requests rotation of its own keys as part of scheduled maintenance.
+     * Returns encrypted new key immediately for streamlined workflow.
+     */
+    @Transactional
+    public KeyRotationResponse initiateTerminalRotation(TerminalRotationRequest request) {
+        log.info("Terminal {} requesting rotation of {}", request.getTerminalId(), request.getKeyType());
+
+        // Get terminal
+        Terminal terminal = terminalRepository.findByTerminalId(request.getTerminalId())
+                .orElseThrow(() -> new IllegalArgumentException("Terminal not found: " + request.getTerminalId()));
+
+        // Validate key type
+        KeyType keyType = KeyType.valueOf(request.getKeyType().toUpperCase());
+        if (keyType != KeyType.TPK && keyType != KeyType.TSK) {
+            throw new IllegalArgumentException("Terminal can only rotate TPK or TSK keys, not: " + keyType);
+        }
+
+        // Find current active key for this terminal
+        MasterKey currentKey = masterKeyRepository.findByStatusAndKeyTypeAndIdTerminal(
+                MasterKey.KeyStatus.ACTIVE,
+                keyType,
+                terminal.getId()
+        ).stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        String.format("No active %s key found for terminal %s",
+                                keyType, request.getTerminalId())));
+
+        // Create rotation request
+        KeyRotationRequest rotationRequest = KeyRotationRequest.builder()
+                .keyId(currentKey.getId())
+                .rotationType(request.getRotationType())
+                .reason(request.getDescription() != null
+                        ? request.getDescription()
+                        : String.format("Terminal-initiated %s rotation", keyType))
+                .gracePeriodHours(request.getGracePeriodHours())
+                .autoComplete(true) // Terminal-initiated always auto-completes
+                .build();
+
+        // Initiate rotation (auto-approved)
+        String initiatedBy = "TERMINAL:" + request.getTerminalId();
+        KeyRotationResponse response = initiateRotation(rotationRequest, initiatedBy);
+
+        // Immediately deliver encrypted new key (streamlined for terminal-initiated)
+        KeyRotationHistory rotation = rotationHistoryRepository.findById(response.getRotationId())
+                .orElseThrow(() -> new IllegalStateException("Rotation not found after creation"));
+
+        // Find participant record
+        RotationParticipant participant = participantRepository.findByRotation(rotation).stream()
+                .filter(p -> p.getTerminal() != null && p.getTerminal().getId().equals(terminal.getId()))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Participant not found after rotation creation"));
+
+        // Encrypt new key under current key
+        byte[] oldKeyData = rotation.getOldKey().getKeyData();
+        byte[] newKeyData = rotation.getNewKey().getKeyData();
+        String encryptedNewKey = encryptKeyForDelivery(newKeyData, oldKeyData);
+
+        // Mark participant as DELIVERED
+        participant.setUpdateStatus(RotationParticipant.UpdateStatus.DELIVERED);
+        participant.setNewKeyDeliveredAt(LocalDateTime.now());
+        participant.setDeliveryAttempts(1);
+        participant.setLastDeliveryAttempt(LocalDateTime.now());
+        participantRepository.save(participant);
+
+        log.info("New key delivered immediately to terminal: {}", request.getTerminalId());
+
+        // Add encrypted key fields to response
+        response.setEncryptedNewKey(encryptedNewKey);
+        response.setNewKeyChecksum(rotation.getNewKey().getKeyChecksum().substring(0, 16));
+        response.setKeyType(rotation.getNewKey().getKeyType().toString());
+        response.setGracePeriodEndsAt(calculateGracePeriodEnd(rotation).toString());
+
+        // Update message for immediate delivery
+        long pending = participantRepository.countByRotationAndUpdateStatus(
+                rotation, RotationParticipant.UpdateStatus.PENDING);
+        long delivered = participantRepository.countByRotationAndUpdateStatus(
+                rotation, RotationParticipant.UpdateStatus.DELIVERED);
+
+        response.setMessage(String.format(
+                "Terminal-initiated rotation started. New key delivered immediately. " +
+                "Please install and confirm. (Pending: %d, Delivered: %d)",
+                pending, delivered));
+
+        return response;
+    }
+
+    /**
      * Initiate key rotation for a master key.
      * Creates new key and rotation tracking record with PENDING status.
      */

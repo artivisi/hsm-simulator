@@ -1,5 +1,6 @@
 package com.artivisi.hsm.simulator.repository;
 
+import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -19,6 +20,8 @@ public interface MasterKeyRepository extends JpaRepository<MasterKey, UUID> {
     Optional<MasterKey> findByKeyCeremonyId(UUID keyCeremonyId);
 
     List<MasterKey> findByStatus(MasterKey.KeyStatus status);
+
+    List<MasterKey> findByStatusAndKeyTypeAndIdTerminal(MasterKey.KeyStatus status, KeyType keyType, UUID terminalId);
 
     @Query("SELECT m FROM MasterKey m WHERE m.status = 'ACTIVE' ORDER BY m.generatedAt DESC")
     Optional<MasterKey> findActiveMasterKey();

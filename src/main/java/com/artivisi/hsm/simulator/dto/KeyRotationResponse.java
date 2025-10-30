@@ -30,4 +30,10 @@ public class KeyRotationResponse {
     private Integer confirmedParticipants;
     private Integer failedParticipants;
     private String message;
+
+    // Optional fields for terminal-initiated rotation (immediate key delivery)
+    private String encryptedNewKey;
+    private String newKeyChecksum;
+    private String keyType;
+    private String gracePeriodEndsAt;
 }

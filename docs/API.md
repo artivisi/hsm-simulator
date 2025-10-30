@@ -1153,9 +1153,96 @@ curl -X POST http://localhost:8080/api/hsm/key/exchange \
 
 The HSM Simulator provides comprehensive key rotation functionality with pending state tracking. This allows terminals and banks to update their keys in a controlled manner without service interruption.
 
-#### 12.1 Initiate Key Rotation
+#### 12.1 Terminal-Initiated Key Rotation (Auto-Approved)
 
-Start rotation process for a master key. Creates new key and tracks all participants that need to update.
+Terminal requests rotation of its own keys as part of scheduled maintenance. This is **automatically approved** and immediately starts the rotation process.
+
+**Use Case**: Terminals running scheduled rotation tasks (e.g., monthly key rotation) can initiate their own key rotation without administrator intervention.
+
+**Endpoint**: `POST /api/hsm/terminal/{terminalId}/request-rotation`
+
+**Request Body**:
+```json
+{
+  "terminalId": "TRM-ISS001-ATM-001",
+  "keyType": "TPK",
+  "rotationType": "SCHEDULED",
+  "description": "Monthly scheduled rotation",
+  "gracePeriodHours": 24
+}
+```
+
+**Request Parameters**:
+- `terminalId` (path, required): Terminal identifier
+- `keyType` (body, required): Type of key to rotate - `TPK` or `TSK`
+- `rotationType` (body, optional): Type of rotation (default: `SCHEDULED`)
+- `description` (body, optional): Description of rotation reason
+- `gracePeriodHours` (body, optional): Hours before old key is revoked (default: 24)
+
+**Response** (includes encrypted new key immediately):
+```json
+{
+  "rotationId": "550e8400-e29b-41d4-a716-446655440000",
+  "rotationIdString": "ROT-TPK-ABC12345",
+  "oldKeyId": "TPK-TRM-ISS001-ATM-001-OLD",
+  "newKeyId": "TPK-TRM-ISS001-ATM-001-NEW",
+  "rotationType": "SCHEDULED",
+  "rotationStatus": "IN_PROGRESS",
+  "rotationStartedAt": "2025-10-31T10:00:00",
+  "totalParticipants": 1,
+  "pendingParticipants": 0,
+  "confirmedParticipants": 0,
+  "failedParticipants": 0,
+  "message": "Terminal-initiated rotation started. New key delivered immediately. Please install and confirm.",
+  "encryptedNewKey": "1A2B3C4D5E6F7890ABCDEF0123456789...",
+  "newKeyChecksum": "A8FC6D4EEB35",
+  "keyType": "TPK",
+  "gracePeriodEndsAt": "2025-11-01T10:00:00"
+}
+```
+
+**Key Delivery**: For terminal-initiated rotation, the encrypted new key is **delivered immediately in the response** to streamline the workflow. The key is encrypted under the current terminal key using AES-128-CBC with derived operational key (derivation context: `KEY_DELIVERY:ROTATION`).
+
+**Streamlined Terminal Workflow** (2 steps):
+```bash
+# 1. Terminal initiates rotation and receives encrypted key immediately
+curl -X POST http://localhost:8080/api/hsm/terminal/TRM-ISS001-ATM-001/request-rotation \
+  -H "Content-Type: application/json" \
+  -d '{
+    "keyType": "TPK",
+    "rotationType": "SCHEDULED",
+    "description": "Monthly scheduled rotation"
+  }'
+
+# Response includes rotationId AND encryptedNewKey
+# {
+#   "rotationId": "550e8400-...",
+#   "encryptedNewKey": "1A2B3C4D5E6F...",
+#   "newKeyChecksum": "A8FC6D4EEB35",
+#   ...
+# }
+
+# 2. Terminal decrypts, installs new key, and confirms
+curl -X POST http://localhost:8080/api/hsm/terminal/TRM-ISS001-ATM-001/confirm-key-update \
+  -H "Content-Type: application/json" \
+  -d '{
+    "rotationId": "550e8400-...",
+    "confirmedBy": "TERMINAL_SCHEDULED_TASK"
+  }'
+
+# Rotation auto-completes, old key is ROTATED
+```
+
+**Security Notes**:
+- Terminal can only rotate its own keys (TPK/TSK)
+- Cannot rotate bank-wide keys (TMK/ZMK)
+- Rotation is immediately approved (no admin intervention)
+- Old key remains active during grace period
+- Ideal for automated scheduled maintenance tasks
+
+#### 12.2 Admin-Initiated Key Rotation
+
+Administrator starts rotation process for any master key. Creates new key and tracks all participants that need to update.
 
 **Endpoint**: `POST /api/hsm/key/rotate`
 
@@ -1202,7 +1289,7 @@ Start rotation process for a master key. Creates new key and tracks all particip
 - `ROLLED_BACK`: Rotation cancelled, old key active
 - `CANCELLED`: Rotation cancelled by admin
 
-#### 12.2 Terminal Requests Updated Key
+#### 12.3 Terminal Requests Updated Key
 
 ATM/Terminal requests new key during rotation. Returns encrypted key for secure delivery.
 
@@ -1246,7 +1333,7 @@ ATM/Terminal requests new key during rotation. Returns encrypted key for secure 
 - Random IV prepended to encrypted data
 - Terminal must decrypt using operational key derived from current master key
 
-#### 12.3 Terminal Confirms Key Installation
+#### 12.4 Terminal Confirms Key Installation
 
 Terminal confirms successful installation of new key.
 
@@ -1285,7 +1372,7 @@ Terminal confirms successful installation of new key.
 **Auto-Completion**:
 If `autoComplete` was set to `true` and all participants have confirmed, the rotation will automatically complete and the old key will be marked as `ROTATED`.
 
-#### 12.4 Get Rotation Status
+#### 12.5 Get Rotation Status
 
 Check current status of rotation with participant details.
 
@@ -1309,7 +1396,7 @@ Check current status of rotation with participant details.
 }
 ```
 
-#### 12.5 Complete Rotation Manually
+#### 12.6 Complete Rotation Manually
 
 Manually complete rotation and revoke old key. Use after grace period or when all participants confirmed.
 
@@ -1340,7 +1427,7 @@ Manually complete rotation and revoke old key. Use after grace period or when al
 - Old key revocation timestamp recorded
 - Rotation status changed to `COMPLETED`
 
-#### 12.6 Rollback Rotation
+#### 12.7 Rollback Rotation
 
 Cancel rotation and revert to old key. New key is revoked.
 

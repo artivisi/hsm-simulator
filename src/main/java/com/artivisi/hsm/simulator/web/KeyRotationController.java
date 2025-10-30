@@ -24,8 +24,64 @@ public class KeyRotationController {
     private final KeyRotationService keyRotationService;
 
     /**
+     * POST /api/hsm/terminal/{terminalId}/request-rotation
+     * Terminal-initiated key rotation (auto-approved).
+     * Terminal requests rotation of its own keys as part of scheduled maintenance.
+     *
+     * Request body:
+     * {
+     *   "terminalId": "TRM-ISS001-ATM-001",
+     *   "keyType": "TPK",
+     *   "rotationType": "SCHEDULED",
+     *   "description": "Monthly scheduled rotation",
+     *   "gracePeriodHours": 24
+     * }
+     *
+     * Response:
+     * {
+     *   "rotationId": "uuid",
+     *   "rotationIdString": "ROT-TPK-ABC12345",
+     *   "oldKeyId": "TPK-TRM-ISS001-ATM-001-OLD",
+     *   "newKeyId": "TPK-TRM-ISS001-ATM-001-NEW",
+     *   "rotationType": "SCHEDULED",
+     *   "rotationStatus": "IN_PROGRESS",
+     *   "totalParticipants": 1,
+     *   "pendingParticipants": 1,
+     *   "message": "Terminal-initiated rotation started. Please retrieve new key."
+     * }
+     */
+    @PostMapping("/terminal/{terminalId}/request-rotation")
+    public ResponseEntity<?> terminalRequestRotation(
+            @PathVariable String terminalId,
+            @RequestBody(required = false) TerminalRotationRequest request
+    ) {
+        log.info("API: Terminal {} requesting rotation", terminalId);
+
+        try {
+            // If no request body, create default request
+            if (request == null) {
+                request = TerminalRotationRequest.builder()
+                        .terminalId(terminalId)
+                        .keyType("TPK") // Default to TPK
+                        .build();
+            } else {
+                request.setTerminalId(terminalId);
+            }
+
+            KeyRotationResponse response = keyRotationService.initiateTerminalRotation(request);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error processing terminal rotation request from: " + terminalId, e);
+            return ResponseEntity.badRequest().body(Map.of(
+                    "error", e.getMessage()
+            ));
+        }
+    }
+
+    /**
      * POST /api/hsm/key/rotate
-     * Initiate key rotation for a master key.
+     * Initiate key rotation for a master key (admin-initiated).
      * Creates new key and tracks all participants that need to update.
      *
      * Request body:

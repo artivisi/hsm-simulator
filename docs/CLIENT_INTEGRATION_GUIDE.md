@@ -785,10 +785,28 @@ The HSM supports secure key rotation with **pending state tracking**. This allow
 - `IN_PROGRESS`: Rotation ongoing
 - `COMPLETED`: All participants confirmed, old key rotated
 
-### Rotation Workflow
+### Rotation Workflows
+
+#### Terminal-Initiated Rotation (Scheduled Tasks) - Streamlined
 
 ```
-1. HSM Administrator → Initiate Rotation
+1. Terminal Scheduled Task → POST /api/hsm/terminal/{terminalId}/request-rotation
+   ↓
+2. HSM → Auto-Approve, Generate New Key, Encrypt & Return Immediately (IN_PROGRESS)
+   ↓ (Response includes encryptedNewKey)
+3. Terminal → Decrypt, Install, Test New Key
+   ↓
+4. Terminal → POST /api/hsm/terminal/{terminalId}/confirm-key-update
+   ↓
+5. HSM → Auto-Complete Rotation (revoke old key)
+```
+
+**Optimization**: Terminal-initiated rotation delivers the encrypted new key immediately in the initial response, eliminating the need for a separate `get-updated-key` API call. This streamlines the workflow from 7 steps to 5 steps.
+
+#### Admin-Initiated Rotation (Bank-Wide)
+
+```
+1. HSM Administrator → POST /api/hsm/key/rotate
    ↓
 2. HSM → Generate New Key, Create Rotation Record (IN_PROGRESS)
    ↓
@@ -833,7 +851,75 @@ public class TerminalKeyRotationHandler {
     }
 
     /**
+     * Initiate scheduled key rotation (terminal-initiated workflow).
+     * Use this when terminal needs to proactively rotate its own keys.
+     * Returns encrypted key immediately in single API call.
+     */
+    public boolean initiateScheduledRotation(String keyType) throws Exception {
+        System.out.println("Initiating scheduled rotation for " + keyType + "...");
+
+        // Step 1: Request rotation and receive encrypted key immediately
+        String url = hsmBaseUrl + "/api/hsm/terminal/" + terminalId + "/request-rotation";
+
+        String requestBody = String.format("""
+            {
+              "keyType": "%s",
+              "rotationType": "SCHEDULED",
+              "description": "Monthly scheduled rotation",
+              "gracePeriodHours": 24
+            }
+            """, keyType);
+
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpResponse<String> response = httpClient.send(request,
+                HttpResponse.BodyHandlers.ofString());
+
+        if (response.statusCode() != 200) {
+            throw new RuntimeException("Failed to initiate rotation: " + response.body());
+        }
+
+        // Parse response (includes encryptedNewKey immediately)
+        KeyRotationResponse rotationResponse = parseKeyRotationResponse(response.body());
+
+        System.out.println("Rotation initiated: " + rotationResponse.getRotationId());
+        System.out.println("Grace period ends: " + rotationResponse.getGracePeriodEndsAt());
+
+        // Step 2: Decrypt new key using current master key
+        byte[] newKeyData = decryptNewKey(
+                rotationResponse.getEncryptedNewKey(),
+                getCurrentMasterKey()
+        );
+
+        // Step 3: Verify new key checksum
+        String computedChecksum = calculateKeyChecksum(newKeyData);
+        if (!computedChecksum.equals(rotationResponse.getNewKeyChecksum())) {
+            throw new SecurityException("New key checksum mismatch!");
+        }
+
+        // Step 4: Install new key (store securely)
+        installNewKey(newKeyData, keyType);
+
+        // Step 5: Test new key with HSM (optional but recommended)
+        boolean testPassed = testNewKey(newKeyData);
+        if (!testPassed) {
+            throw new RuntimeException("New key test failed!");
+        }
+
+        // Step 6: Confirm successful installation to HSM
+        confirmKeyInstallation(rotationResponse.getRotationId());
+
+        System.out.println("Scheduled key rotation completed successfully!");
+        return true;
+    }
+
+    /**
      * Check for pending key rotation and update keys if available.
+     * Use this for admin-initiated rotations where HSM notifies terminals.
      * This should be called periodically (e.g., every hour) or on terminal startup.
      */
     public boolean checkAndUpdateKeys() throws Exception {
@@ -1026,8 +1112,21 @@ public class TerminalApplication {
                 "TRM-ISS001-ATM-001"
         );
 
-        // Check for key rotation every hour
         ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
+        // Option 1: Terminal-initiated scheduled rotation (monthly)
+        // Use this when terminal proactively rotates its own keys
+        scheduler.scheduleAtFixedRate(() -> {
+            try {
+                rotationHandler.initiateScheduledRotation("TPK");
+                System.out.println("Scheduled TPK rotation completed");
+            } catch (Exception e) {
+                System.err.println("Scheduled rotation failed: " + e.getMessage());
+            }
+        }, 0, 30, TimeUnit.DAYS);
+
+        // Option 2: Check for admin-initiated rotation (hourly)
+        // Use this to check if HSM administrator started a rotation
         scheduler.scheduleAtFixedRate(() -> {
             try {
                 boolean keysUpdated = rotationHandler.checkAndUpdateKeys();
@@ -1057,9 +1156,63 @@ class TerminalKeyRotationHandler:
         self.hsm_base_url = hsm_base_url
         self.terminal_id = terminal_id
 
+    def initiate_scheduled_rotation(self, key_type: str) -> bool:
+        """
+        Initiate scheduled key rotation (terminal-initiated workflow).
+        Use this when terminal needs to proactively rotate its own keys.
+        Returns encrypted key immediately in single API call.
+        """
+        print(f"Initiating scheduled rotation for {key_type}...")
+
+        # Step 1: Request rotation and receive encrypted key immediately
+        url = f"{self.hsm_base_url}/api/hsm/terminal/{self.terminal_id}/request-rotation"
+
+        payload = {
+            "keyType": key_type,
+            "rotationType": "SCHEDULED",
+            "description": "Monthly scheduled rotation",
+            "gracePeriodHours": 24
+        }
+
+        response = requests.post(url, json=payload)
+
+        if response.status_code != 200:
+            raise RuntimeError(f"Failed to initiate rotation: {response.text}")
+
+        # Parse response (includes encryptedNewKey immediately)
+        rotation_response = response.json()
+
+        print(f"Rotation initiated: {rotation_response['rotationId']}")
+        print(f"Grace period ends: {rotation_response['gracePeriodEndsAt']}")
+
+        # Step 2: Decrypt new key using current master key
+        new_key_data = self.decrypt_new_key(
+            rotation_response['encryptedNewKey'],
+            self.get_current_master_key()
+        )
+
+        # Step 3: Verify new key checksum
+        computed_checksum = self.calculate_key_checksum(new_key_data)
+        if computed_checksum != rotation_response['newKeyChecksum']:
+            raise SecurityError("New key checksum mismatch!")
+
+        # Step 4: Install new key (store securely)
+        self.install_new_key(new_key_data, key_type)
+
+        # Step 5: Test new key with HSM (optional but recommended)
+        if not self.test_new_key(new_key_data):
+            raise RuntimeError("New key test failed!")
+
+        # Step 6: Confirm successful installation to HSM
+        self.confirm_key_installation(rotation_response['rotationId'])
+
+        print("Scheduled key rotation completed successfully!")
+        return True
+
     def check_and_update_keys(self) -> bool:
         """
         Check for pending key rotation and update keys if available.
+        Use this for admin-initiated rotations where HSM notifies terminals.
         Returns True if keys were rotated, False otherwise.
         """
         print("Checking for pending key rotation...")
@@ -1197,7 +1350,12 @@ def main():
         "TRM-ISS001-ATM-001"
     )
 
-    # Check for rotation every hour
+    # Option 1: Terminal-initiated scheduled rotation (monthly)
+    # Use this when terminal proactively rotates its own keys
+    schedule.every(30).days.do(lambda: handler.initiate_scheduled_rotation("TPK"))
+
+    # Option 2: Check for admin-initiated rotation (hourly)
+    # Use this to check if HSM administrator started a rotation
     schedule.every(1).hours.do(handler.check_and_update_keys)
 
     while True:
