@@ -240,6 +240,7 @@ INSERT INTO master_keys (
     kdf_salt,
     status,
     parent_key_id,
+    id_bank,
     id_terminal,
     generated_at,
     activated_at
@@ -257,10 +258,13 @@ SELECT
     'TRM-ISS001-ATM-001',
     'ACTIVE',
     (SELECT id FROM master_keys WHERE master_key_id = 'TMK-ISS001-SAMPLE'),
+    b.id,
     t.id,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
-FROM terminals t WHERE t.terminal_id = 'TRM-ISS001-ATM-001';
+FROM terminals t, banks b
+WHERE t.terminal_id = 'TRM-ISS001-ATM-001'
+  AND b.bank_code = 'ISS001';
 
 -- Sample TSK (Terminal Security Key) for terminal TRM-ISS001-ATM-001
 -- Child of TMK, used for MAC generation and verification
@@ -278,6 +282,7 @@ INSERT INTO master_keys (
     kdf_salt,
     status,
     parent_key_id,
+    id_bank,
     id_terminal,
     generated_at,
     activated_at
@@ -295,10 +300,13 @@ SELECT
     'TRM-ISS001-ATM-001',
     'ACTIVE',
     (SELECT id FROM master_keys WHERE master_key_id = 'TMK-ISS001-SAMPLE'),
+    b.id,
     t.id,
     CURRENT_TIMESTAMP,
     CURRENT_TIMESTAMP
-FROM terminals t WHERE t.terminal_id = 'TRM-ISS001-ATM-001';
+FROM terminals t, banks b
+WHERE t.terminal_id = 'TRM-ISS001-ATM-001'
+  AND b.bank_code = 'ISS001';
 
 -- ============================================================================
 -- Sample Generated PINs
