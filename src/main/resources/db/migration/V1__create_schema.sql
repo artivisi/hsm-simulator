@@ -524,7 +524,7 @@ CREATE TABLE generated_macs (
     message TEXT NOT NULL,
     message_length INTEGER NOT NULL,
     mac_value VARCHAR(64) NOT NULL,
-    mac_algorithm VARCHAR(50) NOT NULL CHECK (mac_algorithm IN ('ISO9797-ALG3', 'HMAC-SHA256', 'CBC-MAC')),
+    mac_algorithm VARCHAR(50) NOT NULL CHECK (mac_algorithm IN ('ISO9797-ALG3', 'HMAC-SHA256', 'CBC-MAC', 'AES-CMAC')),
     id_mac_key UUID NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' CHECK (status IN ('ACTIVE', 'EXPIRED', 'REVOKED')),
     verification_attempts INTEGER DEFAULT 0,

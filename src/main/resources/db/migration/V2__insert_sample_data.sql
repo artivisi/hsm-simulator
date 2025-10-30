@@ -313,7 +313,7 @@ INSERT INTO generated_pins (
     pin_format,
     encrypted_pin_block,
     pin_verification_value,
-    encryption_key_id,
+    id_encryption_key,
     clear_pin,
     status,
     verification_attempts,
@@ -347,7 +347,7 @@ INSERT INTO generated_macs (
     message_length,
     mac_value,
     mac_algorithm,
-    mac_key_id,
+    id_mac_key,
     status,
     verification_attempts,
     generated_at
@@ -406,7 +406,7 @@ COMMENT ON TABLE generated_macs IS 'Sample MAC for testing MAC verification with
 --   Endpoint: POST /api/hsm/mac/verify
 --   Message: "0800822000000000000004000000000000000000001234567890123456"
 --   MAC: ABCDEF0123456789 (16 hex chars, 64-bit)
---   Algorithm: AES-CMAC
+--   Algorithm: AES-CMAC (NIST SP 800-38B)
 --   Key: TSK-TRM-ISS001-ATM-001
 --
 -- NOTE: The encrypted_pin_block and mac_value are placeholders.
