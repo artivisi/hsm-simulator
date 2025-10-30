@@ -363,4 +363,16 @@ public class KeyOperationService {
         }
         return result.toString();
     }
+
+    /**
+     * Get key data in plaintext (hex encoded) for educational purposes
+     */
+    public String getKeyPlaintext(UUID keyId) {
+        log.info("Retrieving plaintext for key: {}", keyId);
+
+        MasterKey key = masterKeyRepository.findById(keyId)
+                .orElseThrow(() -> new IllegalArgumentException("Key not found: " + keyId));
+
+        return bytesToHex(key.getKeyDataEncrypted());
+    }
 }
