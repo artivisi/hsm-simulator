@@ -2,6 +2,7 @@ package com.artivisi.hsm.simulator.service;
 
 import com.artivisi.hsm.simulator.entity.*;
 import com.artivisi.hsm.simulator.repository.*;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -258,7 +259,7 @@ public class CeremonyService {
                     .combinedEntropyHash(keyResult.getCombinedEntropyHash())
                     .generationMethod("PBKDF2")
                     .kdfIterations(100000)
-                    .kdfSalt(bytesToHex(salt))
+                    .kdfSalt(CryptoUtils.bytesToHexLowercase(salt))
                     .status(MasterKey.KeyStatus.ACTIVE)
                     .activatedAt(LocalDateTime.now())
                     .build();
@@ -507,14 +508,6 @@ public class CeremonyService {
         } catch (Exception e) {
             throw new RuntimeException("Failed to derive encryption key from passphrase", e);
         }
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.artivisi.hsm.simulator.service;
 
 import com.artivisi.hsm.simulator.entity.PassphraseContribution;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -145,19 +146,11 @@ public class PassphraseService {
         try {
             java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-256");
             byte[] hashBytes = digest.digest(passphraseHash.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            return bytesToHex(hashBytes).substring(0, 16); // First 16 characters of hex
+            return CryptoUtils.bytesToHexLowercase(hashBytes).substring(0, 16); // First 16 characters of hex
         } catch (Exception e) {
             log.error("Error generating contribution fingerprint", e);
             throw new RuntimeException("Failed to generate fingerprint", e);
         }
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
     }
 
     /**

@@ -1,6 +1,7 @@
 package com.artivisi.hsm.simulator.service;
 
 import com.artivisi.hsm.simulator.config.CryptoConstants;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -61,14 +62,14 @@ public class KeyGenerationService {
             // Calculate key fingerprint (SHA-256 hash of key)
             MessageDigest digest = MessageDigest.getInstance(CryptoConstants.HASH_ALGORITHM);
             byte[] fingerprintBytes = digest.digest(keyBytes);
-            String fingerprint = formatFingerprint(fingerprintBytes);
+            String fingerprint = CryptoUtils.bytesToHexLowercase(fingerprintBytes);
 
             // Calculate key checksum (first 8 bytes of SHA-256)
-            String checksum = bytesToHex(Arrays.copyOf(fingerprintBytes, 8));
+            String checksum = CryptoUtils.bytesToHexLowercase(Arrays.copyOf(fingerprintBytes, 8));
 
             // Calculate combined entropy hash
             byte[] entropyHashBytes = digest.digest(combinedEntropy.getBytes());
-            String entropyHash = bytesToHex(entropyHashBytes);
+            String entropyHash = CryptoUtils.bytesToHexLowercase(entropyHashBytes);
 
             log.info("Master key derived successfully. Fingerprint: {}", fingerprint);
 
@@ -104,9 +105,7 @@ public class KeyGenerationService {
      * Generates a cryptographically secure salt for PBKDF2.
      */
     public byte[] generateSalt() {
-        byte[] salt = new byte[CryptoConstants.KDF_SALT_BYTES];
-        secureRandom.nextBytes(salt);
-        return salt;
+        return CryptoUtils.generateSalt();
     }
 
     /**
@@ -289,14 +288,7 @@ public class KeyGenerationService {
      * Generates a verification hash for a share to detect tampering.
      */
     public String generateShareVerificationHash(byte[] shareData) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance(CryptoConstants.HASH_ALGORITHM);
-            byte[] hash = digest.digest(shareData);
-            return bytesToHex(hash);
-        } catch (Exception e) {
-            log.error("Error generating share verification hash", e);
-            throw new RuntimeException("Failed to generate verification hash", e);
-        }
+        return CryptoUtils.generateFullHash(shareData);
     }
 
     /**
@@ -309,39 +301,8 @@ public class KeyGenerationService {
      * @return Derived key of specified length
      */
     public byte[] deriveOperationalKey(byte[] masterKey, String context, int outputBytes) {
-        try {
-            log.debug("Deriving {}-byte operational key with context: {}", outputBytes, context);
-
-            // Convert master key to hex string for PBKDF2 password
-            String password = bytesToHex(masterKey);
-
-            // Use context as salt (includes key type, bank ID, terminal ID, etc.)
-            byte[] salt = context.getBytes(StandardCharsets.UTF_8);
-
-            // Use same PBKDF2 parameters as master key generation
-            SecretKeyFactory factory = SecretKeyFactory.getInstance(CryptoConstants.KDF_ALGORITHM);
-            PBEKeySpec spec = new PBEKeySpec(
-                password.toCharArray(),
-                salt,
-                CryptoConstants.KDF_ITERATIONS,
-                outputBytes * 8  // Convert bytes to bits
-            );
-
-            byte[] derivedKey = factory.generateSecret(spec).getEncoded();
-
-            // Clear sensitive data
-            spec.clearPassword();
-
-            log.debug("Successfully derived {}-byte key (fingerprint: {})",
-                     outputBytes,
-                     bytesToHex(Arrays.copyOf(derivedKey, 4)));
-
-            return derivedKey;
-
-        } catch (Exception e) {
-            log.error("Failed to derive operational key for context: {}", context, e);
-            throw new RuntimeException("Key derivation failed", e);
-        }
+        // Delegate to CryptoUtils for consistent key derivation
+        return CryptoUtils.deriveKeyFromParent(masterKey, context, outputBytes * 8);
     }
 
     /**
@@ -475,19 +436,6 @@ public class KeyGenerationService {
                 .build();
     }
 
-    private String formatFingerprint(byte[] bytes) {
-        // Use full SHA-256 hash (32 bytes = 64 hex characters) for complete fingerprint
-        String hex = bytesToHex(bytes);
-        return hex.toLowerCase(); // Return full hex string without formatting for better compatibility
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
-    }
 
     // ===== Result Classes =====
 

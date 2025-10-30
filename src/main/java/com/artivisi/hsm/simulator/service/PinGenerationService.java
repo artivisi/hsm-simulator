@@ -6,6 +6,7 @@ import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.repository.GeneratedPinRepository;
 import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -659,7 +660,7 @@ public class PinGenerationService {
             cipher.init(Cipher.ENCRYPT_MODE, secretKey, ivSpec);
 
             // Convert hex PIN block to bytes
-            byte[] pinBlockBytes = hexToBytes(pinBlock);
+            byte[] pinBlockBytes = CryptoUtils.hexToBytes(pinBlock);
 
             // Encrypt (PKCS5Padding handles padding automatically)
             byte[] encrypted = cipher.doFinal(pinBlockBytes);
@@ -669,7 +670,7 @@ public class PinGenerationService {
             System.arraycopy(iv, 0, result, 0, iv.length);
             System.arraycopy(encrypted, 0, result, iv.length, encrypted.length);
 
-            return bytesToHex(result);
+            return CryptoUtils.bytesToHex(result);
         } catch (Exception e) {
             log.error("Failed to encrypt PIN block", e);
             throw new RuntimeException("Failed to encrypt PIN block", e);
@@ -692,7 +693,7 @@ public class PinGenerationService {
             Cipher cipher = Cipher.getInstance(CryptoConstants.PIN_CIPHER);
 
             // Convert hex to bytes
-            byte[] encryptedBytes = hexToBytes(encryptedPinBlock);
+            byte[] encryptedBytes = CryptoUtils.hexToBytes(encryptedPinBlock);
 
             // Extract IV and ciphertext
             byte[] iv = new byte[CryptoConstants.CBC_IV_BYTES];
@@ -705,7 +706,7 @@ public class PinGenerationService {
 
             // Decrypt
             byte[] decrypted = cipher.doFinal(ciphertext);
-            return bytesToHex(decrypted);
+            return CryptoUtils.bytesToHex(decrypted);
         } catch (Exception e) {
             log.error("Failed to decrypt PIN block", e);
             throw new RuntimeException("Failed to decrypt PIN block", e);
@@ -799,21 +800,4 @@ public class PinGenerationService {
         }
     }
 
-    private byte[] hexToBytes(String hex) {
-        int len = hex.length();
-        byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
-            data[i / 2] = (byte) ((Character.digit(hex.charAt(i), 16) << 4)
-                                 + Character.digit(hex.charAt(i+1), 16));
-        }
-        return data;
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02X", b));
-        }
-        return result.toString();
-    }
 }

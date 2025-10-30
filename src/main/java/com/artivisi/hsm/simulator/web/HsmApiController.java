@@ -14,6 +14,7 @@ import com.artivisi.hsm.simulator.service.KeyInitializationService;
 import com.artivisi.hsm.simulator.service.KeyOperationService;
 import com.artivisi.hsm.simulator.service.MacService;
 import com.artivisi.hsm.simulator.service.PinGenerationService;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -782,7 +783,7 @@ public class HsmApiController {
             System.arraycopy(iv, 0, result, 0, iv.length);
             System.arraycopy(encrypted, 0, result, iv.length, encrypted.length);
 
-            return bytesToHex(result);
+            return CryptoUtils.bytesToHex(result);
         } catch (Exception e) {
             log.error("Failed to encrypt key under key", e);
             throw new RuntimeException("Failed to encrypt key", e);
@@ -796,18 +797,10 @@ public class HsmApiController {
             SecretKeySpec secretKey = new SecretKeySpec(key, CryptoConstants.MASTER_KEY_ALGORITHM);
             cipher.init(Cipher.ENCRYPT_MODE, secretKey);
             byte[] encrypted = cipher.doFinal(new byte[16]); // Encrypt zeros
-            return bytesToHex(encrypted).substring(0, CryptoConstants.KCV_HEX_LENGTH);
+            return CryptoUtils.bytesToHex(encrypted).substring(0, CryptoConstants.KCV_HEX_LENGTH);
         } catch (Exception e) {
             log.error("Failed to calculate KCV", e);
             throw new RuntimeException("Failed to calculate KCV", e);
         }
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02X", b));
-        }
-        return result.toString();
     }
 }

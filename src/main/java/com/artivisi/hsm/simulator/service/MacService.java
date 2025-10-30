@@ -6,6 +6,7 @@ import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.repository.GeneratedMacRepository;
 import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -155,7 +156,7 @@ public class MacService {
             log.debug("AES-CMAC calculated: key_size={}, output_bytes={}, context={}",
                      keySize, outputBytes, context);
 
-            return bytesToHex(macOutput);
+            return CryptoUtils.bytesToHex(macOutput);
 
         } catch (Exception e) {
             log.error("Failed to calculate AES-CMAC for key: {}", key.getId(), e);
@@ -195,7 +196,7 @@ public class MacService {
 
             log.debug("HMAC-SHA256 calculated: output_bytes={}, context={}", outputBytes, context);
 
-            return bytesToHex(macOutput);
+            return CryptoUtils.bytesToHex(macOutput);
 
         } catch (Exception e) {
             log.error("Failed to calculate HMAC-SHA256 for key: {}", key.getId(), e);
@@ -224,13 +225,5 @@ public class MacService {
     public void clearKeyCache() {
         derivedKeyCache.clear();
         log.info("Cleared MAC key cache");
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02X", b));
-        }
-        return result.toString();
     }
 }

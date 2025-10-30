@@ -3,6 +3,7 @@ package com.artivisi.hsm.simulator.service;
 import com.artivisi.hsm.simulator.entity.KeyType;
 import com.artivisi.hsm.simulator.entity.MasterKey;
 import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -239,24 +240,7 @@ public class OfflineRecoveryService {
      * Generates SHA-256 fingerprint of a key
      */
     private String generateKeyFingerprint(byte[] keyData) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(keyData);
-            return bytesToHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to generate key fingerprint", e);
-        }
-    }
-
-    /**
-     * Converts bytes to hex string
-     */
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
+        return CryptoUtils.generateFullHash(keyData);
     }
 
     /**
@@ -306,13 +290,7 @@ public class OfflineRecoveryService {
      * Calculates a simple checksum for the key
      */
     private String calculateChecksum(byte[] keyData) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("MD5");
-            byte[] hash = digest.digest(keyData);
-            return bytesToHex(hash);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to calculate checksum", e);
-        }
+        return CryptoUtils.generateChecksum(keyData);
     }
 
     // ===== Data Classes =====

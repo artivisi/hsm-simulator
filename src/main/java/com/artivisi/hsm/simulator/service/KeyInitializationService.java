@@ -7,6 +7,7 @@ import com.artivisi.hsm.simulator.entity.Terminal;
 import com.artivisi.hsm.simulator.repository.BankRepository;
 import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
 import com.artivisi.hsm.simulator.repository.TerminalRepository;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -477,35 +478,14 @@ public class KeyInitializationService {
     }
 
     private String generateFingerprint(byte[] keyData) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(keyData);
-            return bytesToHex(hash).substring(0, 24);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Failed to generate fingerprint", e);
-        }
+        return CryptoUtils.generateFingerprint(keyData);
     }
 
     private String generateChecksum(byte[] keyData) {
-        try {
-            // Use SHA-256 instead of MD5 for checksums
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(keyData);
-            return bytesToHex(hash).substring(0, 16);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Failed to generate checksum", e);
-        }
+        return CryptoUtils.generateChecksum(keyData);
     }
 
     private String generateShortId() {
         return UUID.randomUUID().toString().substring(0, 8).toUpperCase();
-    }
-
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02X", b));
-        }
-        return result.toString();
     }
 }

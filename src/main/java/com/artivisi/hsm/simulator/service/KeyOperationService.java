@@ -7,6 +7,7 @@ import com.artivisi.hsm.simulator.entity.Terminal;
 import com.artivisi.hsm.simulator.repository.BankRepository;
 import com.artivisi.hsm.simulator.repository.MasterKeyRepository;
 import com.artivisi.hsm.simulator.repository.TerminalRepository;
+import com.artivisi.hsm.simulator.util.CryptoUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -296,7 +297,7 @@ public class KeyOperationService {
         try {
             javax.crypto.SecretKeyFactory factory = javax.crypto.SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256");
             // Use parent key + key type as password material
-            String passwordMaterial = bytesToHex(parentKey) + keyType;
+            String passwordMaterial = CryptoUtils.bytesToHex(parentKey) + keyType;
             javax.crypto.spec.PBEKeySpec spec = new javax.crypto.spec.PBEKeySpec(
                     passwordMaterial.toCharArray(),
                     salt.getBytes(java.nio.charset.StandardCharsets.UTF_8),
@@ -324,26 +325,14 @@ public class KeyOperationService {
      * Generate SHA-256 fingerprint
      */
     private String generateFingerprint(byte[] keyData) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(keyData);
-            return bytesToHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Failed to generate fingerprint", e);
-        }
+        return CryptoUtils.generateFullHash(keyData);
     }
 
     /**
      * Generate SHA-256 checksum (replaces MD5 for security)
      */
     private String generateChecksum(byte[] keyData) {
-        try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] hash = digest.digest(keyData);
-            return bytesToHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException("Failed to generate checksum", e);
-        }
+        return CryptoUtils.generateFullHash(keyData);
     }
 
     /**
@@ -351,17 +340,6 @@ public class KeyOperationService {
      */
     private String generateEntropyHash(byte[] keyData) {
         return generateFingerprint(keyData);
-    }
-
-    /**
-     * Convert bytes to hex string
-     */
-    private String bytesToHex(byte[] bytes) {
-        StringBuilder result = new StringBuilder();
-        for (byte b : bytes) {
-            result.append(String.format("%02x", b));
-        }
-        return result.toString();
     }
 
     /**
@@ -373,6 +351,6 @@ public class KeyOperationService {
         MasterKey key = masterKeyRepository.findById(keyId)
                 .orElseThrow(() -> new IllegalArgumentException("Key not found: " + keyId));
 
-        return bytesToHex(key.getKeyData());
+        return CryptoUtils.bytesToHex(key.getKeyData());
     }
 }
