@@ -640,9 +640,11 @@ public class PinGenerationService {
     private String encryptPinBlock(String pinBlock, MasterKey key) {
         try {
             // Derive operational PIN key using context
+            // Use bank UUID as identifier (matches SampleDataGeneratorTest)
+            String identifier = key.getIdBank() != null ? key.getIdBank().toString() : "GLOBAL";
             String context = keyGenerationService.buildKeyContext(
                 key.getKeyType().toString(),
-                key.getIdBank() != null ? key.getIdBank().toString() : "GLOBAL",
+                identifier,
                 "PIN"
             );
 
@@ -680,9 +682,11 @@ public class PinGenerationService {
     private String decryptPinBlock(String encryptedPinBlock, MasterKey key) {
         try {
             // Derive operational PIN key using context
+            // Use bank UUID as identifier (matches SampleDataGeneratorTest)
+            String identifier = key.getIdBank() != null ? key.getIdBank().toString() : "GLOBAL";
             String context = keyGenerationService.buildKeyContext(
                 key.getKeyType().toString(),
-                key.getIdBank() != null ? key.getIdBank().toString() : "GLOBAL",
+                identifier,
                 "PIN"
             );
 

@@ -1,6 +1,8 @@
 package com.artivisi.hsm.simulator.web;
 
 import com.artivisi.hsm.simulator.dto.*;
+import com.artivisi.hsm.simulator.entity.KeyRotationHistory;
+import com.artivisi.hsm.simulator.repository.KeyRotationHistoryRepository;
 import com.artivisi.hsm.simulator.service.KeyRotationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +24,7 @@ import java.util.UUID;
 public class KeyRotationController {
 
     private final KeyRotationService keyRotationService;
+    private final KeyRotationHistoryRepository rotationHistoryRepository;
 
     /**
      * POST /api/hsm/terminal/{terminalId}/request-rotation
@@ -215,7 +218,32 @@ public class KeyRotationController {
         log.info("API: Terminal {} confirming key update", terminalId);
 
         try {
-            UUID rotationId = UUID.fromString(request.get("rotationId"));
+            String rotationIdStr = request.get("rotationId");
+            if (rotationIdStr == null) {
+                throw new IllegalArgumentException("rotationId is required");
+            }
+
+            UUID rotationId;
+
+            // Try to parse as UUID first, if that fails look it up by rotationId string
+            try {
+                rotationId = UUID.fromString(rotationIdStr);
+            } catch (IllegalArgumentException e) {
+                // Not a UUID, try to find by rotationId string
+                log.debug("rotationId '{}' is not a UUID, looking up by string rotationId", rotationIdStr);
+                KeyRotationHistory rotation = rotationHistoryRepository.findByRotationId(rotationIdStr)
+                        .orElseThrow(() -> {
+                            log.error("Rotation not found: {}. Available rotations can be found by calling " +
+                                    "GET /api/hsm/rotation/status or checking the 'rotationId' (UUID) or " +
+                                    "'rotationIdString' fields from the rotation response.", rotationIdStr);
+                            return new IllegalArgumentException(
+                                    String.format("Rotation not found: %s. Expected UUID or rotation ID string like 'ROT-TPK-XXXXXXXX'",
+                                    rotationIdStr));
+                        });
+                rotationId = rotation.getId();
+                log.debug("Found rotation with UUID: {}", rotationId);
+            }
+
             String confirmedBy = request.getOrDefault("confirmedBy", terminalId);
 
             KeyRotationResponse response = keyRotationService.confirmKeyUpdate(
