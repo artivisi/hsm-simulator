@@ -1240,6 +1240,70 @@ curl -X POST http://localhost:8080/api/hsm/terminal/TRM-ISS001-ATM-001/confirm-k
 - Old key remains active during grace period
 - Ideal for automated scheduled maintenance tasks
 
+**Implementation Notes**:
+
+⚠️ **CRITICAL**: New rotated keys automatically inherit bank and terminal associations from the old key:
+
+```
+Old Key Attributes:
+  - masterKeyId: "TPK-TRM-ISS001-ATM-001"
+  - idBank: 48a9e84c-ff57-4483-bf83-b255f34a6466 ✓
+  - idTerminal: 7c123abc-4567-... ✓
+  - kdfSalt: "TRM-ISS001-ATM-001" ✓
+  - status: ROTATED (after rotation completes)
+
+New Key Attributes (automatically set):
+  - masterKeyId: "TPK-TRMISS001ATM001-4B6E3217" (new ID)
+  - idBank: 48a9e84c-ff57-4483-bf83-b255f34a6466 ✓ (COPIED from old key)
+  - idTerminal: 7c123abc-4567-... ✓ (COPIED from old key)
+  - kdfSalt: "TRM-ISS001-ATM-001" ✓ (same terminal ID)
+  - status: ACTIVE
+```
+
+**Client Derivation Context (unchanged after rotation)**:
+```java
+// BEFORE rotation
+String context = "TPK:48a9e84c-ff57-4483-bf83-b255f34a6466:PIN";
+byte[] oldOperationalKey = deriveKey(oldMasterKey, context, 128);
+
+// AFTER rotation - SAME CONTEXT STRING, different master key
+String context = "TPK:48a9e84c-ff57-4483-bf83-b255f34a6466:PIN";
+byte[] newOperationalKey = deriveKey(newMasterKey, context, 128);
+
+// Result: Different operational keys, but same bank UUID in context
+// Client code doesn't need to change - just use the new master key
+```
+
+**Why Bank UUID is Used (not Terminal ID)**:
+
+The derivation context uses **bank UUID** rather than terminal ID to enable:
+1. **Consistent context across all terminals in same bank**
+2. **Simpler key management** (one bank UUID, many terminals)
+3. **Operational key uniqueness** comes from different master keys per terminal
+
+Common mistake:
+```java
+// ❌ WRONG: Using terminal ID in context
+String wrongContext = "TPK:" + terminalId + ":PIN";  // "TPK:TRM-ISS001-ATM-001:PIN"
+// Will cause BadPaddingException!
+
+// ✅ CORRECT: Using bank UUID from key metadata
+String correctContext = "TPK:" + masterKey.getBankId() + ":PIN";
+```
+
+**Rotation ID Formats**:
+
+The API accepts both UUID and human-readable rotation IDs:
+```bash
+# Option 1: UUID format (recommended)
+curl ... -d '{"rotationId": "550e8400-e29b-41d4-a716-446655440000"}'
+
+# Option 2: Human-readable format (also works)
+curl ... -d '{"rotationId": "ROT-TPK-ABC12345"}'
+```
+
+Always use `rotationId` or `rotationIdString` from the rotation response - never construct rotation IDs manually.
+
 #### 12.2 Admin-Initiated Key Rotation
 
 Administrator starts rotation process for any master key. Creates new key and tracks all participants that need to update.

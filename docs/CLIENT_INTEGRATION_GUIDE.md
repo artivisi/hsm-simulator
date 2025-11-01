@@ -62,6 +62,83 @@ Examples:
 
 ⚠️ **CRITICAL**: `BANK_UUID` must be the **actual database UUID** (e.g., `48a9e84c-ff57-4483-bf83-b255f34a6466`), **NOT** the string `"GLOBAL"` or bank code like `"ISS001"`.
 
+#### TPK/TSK Derivation Context: Bank UUID vs Terminal ID
+
+**CRITICAL IMPLEMENTATION DETAIL** for terminal keys (TPK/TSK):
+
+| Aspect | Uses Terminal ID | Uses Bank UUID |
+|--------|------------------|----------------|
+| **Master Key Generation** | ✅ `kdfSalt` field stores terminal ID (e.g., `"TRM-ISS001-ATM-001"`) | ✅ `idBank` field stores bank UUID |
+| **Master Key Identification** | ✅ `masterKeyId` includes terminal ID (e.g., `"TPK-TRM-ISS001-ATM-001"`) | - |
+| **Database Associations** | ✅ `idTerminal` foreign key | ✅ `idBank` foreign key |
+| **Operational Key Derivation** | ❌ **NOT USED** | ✅ **REQUIRED** in context string |
+
+**Why This Matters:**
+
+The confusion arises because:
+1. **Master key storage** uses terminal ID for identification and salt
+2. **Operational key derivation** uses bank UUID in the context string
+
+```java
+// WRONG: Using terminal ID in derivation context
+String terminalId = "TRM-ISS001-ATM-001";
+String wrongContext = "TPK:" + terminalId + ":PIN";  // ❌ WILL FAIL!
+
+// CORRECT: Using bank UUID in derivation context
+UUID bankUuid = UUID.fromString("48a9e84c-ff57-4483-bf83-b255f34a6466");
+String correctContext = "TPK:" + bankUuid + ":PIN";  // ✅ WORKS
+```
+
+**Real-World Impact After Key Rotation:**
+
+```
+Before Rotation:
+  Master Key: TPK-TRM-ISS001-ATM-001
+  - idBank: 48a9e84c-ff57-4483-bf83-b255f34a6466 ✓
+  - idTerminal: <terminal_uuid> ✓
+  - kdfSalt: "TRM-ISS001-ATM-001" ✓
+  Context: "TPK:48a9e84c-ff57-4483-bf83-b255f34a6466:PIN" ✓
+  Result: PIN decryption WORKS ✓
+
+After Rotation (if bank/terminal IDs missing):
+  Master Key: TPK-TRMISS001ATM001-4B6E3217
+  - idBank: NULL ❌
+  - idTerminal: NULL ❌
+  - kdfSalt: "TRM-ISS001-ATM-001" ✓
+  Context: "TPK:GLOBAL:PIN" ❌ (fallback due to NULL idBank)
+  Result: PIN decryption FAILS ❌ BadPaddingException
+```
+
+**Client Requirements:**
+
+1. **DO NOT** construct context from terminal ID
+2. **DO** obtain bank UUID from HSM key metadata
+3. **DO** use the same bank UUID before and after rotation
+4. **DO NOT** use `"GLOBAL"` or bank code strings
+
+**How to Get Bank UUID:**
+
+```java
+// Option 1: From key retrieval response
+KeyResponse key = hsmClient.getKey(terminalId, "TPK");
+UUID bankUuid = key.getBankId();  // Use this for derivation
+
+// Option 2: From terminal configuration (stored during provisioning)
+Terminal terminal = configService.getTerminal(terminalId);
+UUID bankUuid = terminal.getBankId();
+
+// Derive operational key
+String context = "TPK:" + bankUuid + ":PIN";
+byte[] operationalKey = deriveOperationalKey(masterKeyBytes, context, 128);
+```
+
+**HSM Implementation Note:**
+
+The HSM ensures all rotated keys maintain bank/terminal associations:
+- New TPK keys automatically copy `idBank` and `idTerminal` from old keys
+- Derivation context remains consistent across rotations
+- No client-side changes needed after rotation
+
 ---
 
 ## Key Management
@@ -1392,6 +1469,154 @@ if __name__ == "__main__":
 - Test new keys thoroughly before confirming
 - Implement automatic rotation checks
 - Support rollback if new key fails
+
+### Key Rotation Troubleshooting
+
+#### Problem: PIN Decryption Fails After Key Rotation
+
+**Symptoms:**
+```
+javax.crypto.BadPaddingException: Given final block not properly padded
+```
+
+**Root Cause Analysis:**
+
+| Check | Command/Action | Expected | Common Issue |
+|-------|---------------|----------|--------------|
+| **1. Key has bank association** | Query `master_keys` table | `id_bank` is NOT NULL | Missing `idBank` in rotated key |
+| **2. Key has terminal association** | Query `master_keys` table | `id_terminal` is NOT NULL | Missing `idTerminal` in rotated key |
+| **3. Derivation context** | Check logs for "Deriving new PIN key" | Context uses bank UUID | Context uses "GLOBAL" or terminal ID |
+| **4. Bank UUID matches** | Compare old vs new key | Same bank UUID | Different or NULL bank UUID |
+
+**Diagnostic Query:**
+```sql
+-- Check key associations for a terminal
+SELECT
+    master_key_id,
+    key_type,
+    status,
+    id_bank,
+    id_terminal,
+    kdf_salt,
+    activated_at
+FROM master_keys mk
+LEFT JOIN terminals t ON mk.id_terminal = t.id
+WHERE t.terminal_id = 'TRM-ISS001-ATM-001'
+  AND mk.key_type IN ('TPK', 'TSK')
+ORDER BY mk.activated_at DESC;
+```
+
+**Expected Output:**
+```
+master_key_id                | key_type | status | id_bank                              | id_terminal                          | kdf_salt
+-----------------------------+----------+--------+--------------------------------------+--------------------------------------+------------------
+TPK-TRMISS001ATM001-4B6E3217 | TPK      | ACTIVE | 48a9e84c-ff57-4483-bf83-b255f34a6466 | 7c123abc-...                        | TRM-ISS001-ATM-001
+TPK-TRM-ISS001-ATM-001       | TPK      | ROTATED| 48a9e84c-ff57-4483-bf83-b255f34a6466 | 7c123abc-...                        | TRM-ISS001-ATM-001
+```
+
+**Fix:**
+If `id_bank` or `id_terminal` is NULL:
+1. This indicates a bug in the HSM key generation (fixed in v1.1.0+)
+2. Update to latest HSM version
+3. Re-run key rotation to generate properly associated keys
+
+**Client-Side Fix:**
+```java
+// Before deriving operational key, verify bank UUID
+MasterKey tpkKey = hsmClient.getKey(terminalId, "TPK");
+
+if (tpkKey.getBankId() == null) {
+    throw new IllegalStateException(
+        "TPK key missing bank association - HSM upgrade required");
+}
+
+// Use bank UUID from key metadata
+String context = "TPK:" + tpkKey.getBankId() + ":PIN";
+byte[] operationalKey = deriveOperationalKey(
+    tpkKey.getKeyData(), context, 128);
+```
+
+#### Problem: Rotation ID Not Found
+
+**Symptoms:**
+```
+IllegalArgumentException: Rotation not found: TRM-ISS001-ATM-001-TPK-v2
+```
+
+**Root Cause:**
+Client sending incorrect rotation ID format (old vs new key ID instead of rotation record ID).
+
+**Solution:**
+Use the `rotationId` or `rotationIdString` from the rotation initiation response:
+
+```java
+// Step 1: Initiate rotation
+RotationResponse response = hsmClient.initiateRotation(terminalId, "TPK");
+
+// CORRECT: Use rotationId from response
+UUID rotationId = response.getRotationId();
+// OR
+String rotationIdString = response.getRotationIdString(); // e.g., "ROT-TPK-93CAFC76"
+
+// Step 2: Confirm with correct ID
+hsmClient.confirmKeyUpdate(terminalId, rotationId);  // ✅ Works
+
+// WRONG: Constructing ID from key names
+String wrongId = terminalId + "-TPK-v2";  // ❌ Will fail
+hsmClient.confirmKeyUpdate(terminalId, wrongId);
+```
+
+#### Problem: Derived Key Mismatch Between Client and HSM
+
+**Symptoms:**
+- Encryption on client side works
+- Decryption on HSM side fails with BadPaddingException
+- Or vice versa
+
+**Diagnostic Steps:**
+
+1. **Verify Context String:**
+```java
+// Enable debug logging
+log.debug("Master key UUID: {}", masterKey.getId());
+log.debug("Bank UUID: {}", masterKey.getBankId());
+log.debug("Derivation context: TPK:{}:PIN", masterKey.getBankId());
+
+// Should output:
+// Master key UUID: f9c9a75c-8d02-40c0-a018-dcc55a45b99d
+// Bank UUID: 48a9e84c-ff57-4483-bf83-b255f34a6466
+// Derivation context: TPK:48a9e84c-ff57-4483-bf83-b255f34a6466:PIN
+```
+
+2. **Verify Iteration Count:**
+```java
+// Must be exactly 100,000
+KeySpec spec = new PBEKeySpec(
+    context.toCharArray(),
+    masterKeyBytes,
+    100000,  // ✅ Correct
+    outputBits
+);
+```
+
+3. **Verify Key Size:**
+```java
+// PIN operations use 128-bit (16 bytes)
+byte[] operationalKey = deriveKey(masterKey, context, 128);
+assertEquals(16, operationalKey.length);  // ✅ Correct
+```
+
+4. **Compare Derived Keys (for testing only):**
+```java
+// Client side
+byte[] clientDerived = deriveOperationalKey(masterKeyBytes, context, 128);
+log.debug("Client derived key (hex): {}", bytesToHex(clientDerived));
+
+// HSM side (from logs)
+// Look for: "Derived TPK PIN Key (first 8 bytes): 1A2B3C4D..."
+
+// First 16 hex chars (8 bytes) should match
+```
 
 ---
 
