@@ -113,7 +113,7 @@ VALUES ('4111111111111111', '8F4A2E1D9C7B5A3E6F8D2C4B7A9E5D3C', 'key-uuid');
 
 ---
 
-**⚠️ IMPORTANT SECURITY NOTE**: Previous versions of this API included a `/api/hsm/pin/verify` endpoint that accepted cleartext PINs. This endpoint has been **removed** as it does not reflect real-world banking security practices. In production HSM systems, cleartext PINs are NEVER transmitted to or processed by the HSM. Always use the secure PIN verification methods below (Method A or Method B).
+****WARNING**: IMPORTANT SECURITY NOTE**: Previous versions of this API included a `/api/hsm/pin/verify` endpoint that accepted cleartext PINs. This endpoint has been **removed** as it does not reflect real-world banking security practices. In production HSM systems, cleartext PINs are NEVER transmitted to or processed by the HSM. Always use the secure PIN verification methods below (Method A or Method B).
 
 ---
 
@@ -299,10 +299,10 @@ Output: PVV (e.g., "1234")
 ```
 
 **Why PVV is Preferred**:
-- ✅ **More secure**: PVV is one-way, cannot be reversed to PIN
-- ✅ **Smaller storage**: 4 digits vs 32+ character encrypted PIN block
-- ✅ **Industry standard**: ISO 9564 compliant
-- ✅ **Production ready**: Used by major banks worldwide
+- ****More secure**: PVV is one-way, cannot be reversed to PIN
+- ****Smaller storage**: 4 digits vs 32+ character encrypted PIN block
+- ****Industry standard**: ISO 9564 compliant
+- ****Production ready**: Used by major banks worldwide
 
 **Response**:
 ```json
@@ -815,7 +815,7 @@ Initialize complete key hierarchy for all banks. This endpoint clears existing s
 | `bankCode` omitted, `clearExisting=true` | ALL keys in database | ALL LMKs deleted & regenerated | Complete reset |
 | `clearExisting=false` | None | N/A | Add keys without clearing |
 
-**⚠️ Important**: Each bank gets its **own LMK** (Local Master Key) for PIN storage isolation. This means:
+****WARNING**: Important**: Each bank gets its **own LMK** (Local Master Key) for PIN storage isolation. This means:
 - ISS001's PIN encrypted under `LMK-ISS001-ABC123` produces different ciphertext than ACQ001's same PIN under `LMK-ACQ001-DEF456`
 - Banks cannot decrypt each other's stored PINs (complete isolation)
 - Realistic simulation of multi-tenant HSM environments
@@ -834,7 +834,7 @@ Initialize complete key hierarchy for all banks. This endpoint clears existing s
 | **Resources** | Low (1 process) | High (2+ processes) |
 | **Complexity** | Simple | Complex |
 | **Realism** | Medium | High |
-| **Workshop Ready** | ✅ Yes | ❌ No (too complex) |
+| **Workshop Ready** | **Yes | **No (too complex) |
 | **Use Case** | Training, demos, testing | Production simulation |
 
 ---
@@ -844,10 +844,10 @@ Initialize complete key hierarchy for all banks. This endpoint clears existing s
 **Use Case**: Single HSM instance serving both issuer and acquirer banks with automatic zone key sharing.
 
 **Advantages**:
-- ✅ Single application instance (minimal resources)
-- ✅ Automatic zone key sharing (no manual copy needed)
-- ✅ Same database
-- ✅ Easier workshop setup
+- **Single application instance (minimal resources)
+- **Automatic zone key sharing (no manual copy needed)
+- **Same database
+- **Easier workshop setup
 
 **How It Works**:
 1. Both banks exist in the same database
@@ -903,10 +903,10 @@ curl -X POST http://localhost:8080/api/hsm/keys/initialize \
 - 🔑 **Each bank gets its own LMK**: `LMK-ISS001-ABC123` ≠ `LMK-ACQ001-PQR678`
   - Same PIN encrypted with different LMKs produces **different ciphertexts**
   - Banks cannot decrypt each other's stored PINs
-- 🔐 **Zone keys are shared**: Different IDs but **identical key material** (same `key_data` bytes)
+- ****Zone keys are shared**: Different IDs but **identical key material** (same `key_data` bytes)
   - `ZPK-ISS001-JKL012` and `ZPK-ACQ001-SHARED-YZA567` can decrypt each other's data
 - 🔄 **Regeneration**: Running initialize again with `clearExisting=true` regenerates that bank's keys with new random values
-- ⚠️ **Key sync**: To regenerate ISS001's keys, re-run step 2, then re-run step 3 to update ACQ001's shared zone keys
+- **WARNING**: **Key sync**: To regenerate ISS001's keys, re-run step 2, then re-run step 3 to update ACQ001's shared zone keys
 
 ---
 
@@ -915,14 +915,14 @@ curl -X POST http://localhost:8080/api/hsm/keys/initialize \
 **Use Case**: Separate HSM instances for each bank (simulates real production environment).
 
 **Advantages**:
-- ✅ Realistic production simulation
-- ✅ True separation of concerns
-- ✅ Each bank has completely isolated HSM
+- **Realistic production simulation
+- **True separation of concerns
+- **Each bank has completely isolated HSM
 
 **Disadvantages**:
-- ❌ Requires more resources (2 instances, 2 databases)
-- ❌ Manual zone key synchronization required
-- ❌ More complex setup
+- **Requires more resources (2 instances, 2 databases)
+- **Manual zone key synchronization required
+- **More complex setup
 
 **Example Workflow**:
 ```bash
@@ -1242,7 +1242,7 @@ curl -X POST http://localhost:8080/api/hsm/terminal/TRM-ISS001-ATM-001/confirm-k
 
 **Implementation Notes**:
 
-⚠️ **CRITICAL**: New rotated keys automatically inherit bank and terminal associations from the old key:
+**WARNING**: **CRITICAL**: New rotated keys automatically inherit bank and terminal associations from the old key:
 
 ```
 Old Key Attributes:
@@ -1283,11 +1283,11 @@ The derivation context uses **bank UUID** rather than terminal ID to enable:
 
 Common mistake:
 ```java
-// ❌ WRONG: Using terminal ID in context
+// **WRONG: Using terminal ID in context
 String wrongContext = "TPK:" + terminalId + ":PIN";  // "TPK:TRM-ISS001-ATM-001:PIN"
 // Will cause BadPaddingException!
 
-// ✅ CORRECT: Using bank UUID from key metadata
+// **CORRECT: Using bank UUID from key metadata
 String correctContext = "TPK:" + masterKey.getBankId() + ":PIN";
 ```
 
@@ -1822,7 +1822,7 @@ All endpoints return appropriate HTTP status codes:
 
 ### Production vs. Simulation
 
-⚠️ **IMPORTANT**: This is an educational HSM simulator. In production HSM:
+**WARNING**: **IMPORTANT**: This is an educational HSM simulator. In production HSM:
 
 1. **Clear PINs**: Never stored or exposed (stored in simulator for educational purposes)
 2. **Key Material**: Protected by hardware security boundary (simulated in software)

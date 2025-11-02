@@ -2,7 +2,7 @@
 
 Dokumentasi ini menjelaskan mekanisme setup terminal master key dan rotasi terminal session key dalam sistem pembayaran, beserta simulasi prosedur tersebut menggunakan HSM Simulator untuk tujuan pembelajaran dan demonstrasi.
 
-## 🎯 Overview
+## Overview
 
 ### Apa itu Terminal Key Management?
 Terminal key management adalah proses pengelolaan kriptografi keys yang digunakan di terminal pembayaran (ATM, EDC, POS) untuk mengamankan transaksi finansial. Proses ini meliputi inisialisasi master key dan rotasi session key secara berkala.
@@ -39,7 +39,7 @@ Terminal key management adalah proses pengelolaan kriptografi keys yang digunaka
 
 ---
 
-## 🔐 Terminal Master Key Setup Process
+## Terminal Master Key Setup Process
 
 ### Konsep Terminal Master Key Setup
 
@@ -593,7 +593,7 @@ graph TB
 
 ---
 
-## 🎯 HSM Simulator untuk Terminal Key Management
+## HSM Simulator untuk Terminal Key Management
 
 ### Simulasi Terminal Master Key Setup
 
@@ -853,7 +853,7 @@ graph LR
 
 ---
 
-## 📊 Best Practices dan Security Considerations
+## Best Practices dan Security Considerations
 
 ### Master Key Management Best Practices
 

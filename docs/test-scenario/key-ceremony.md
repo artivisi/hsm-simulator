@@ -77,7 +77,7 @@ Dokumen ini berisi skenario pengujian khusus untuk Key Ceremony pada HSM Simulat
 1. **Administrator** login ke HSM Simulator
 2. Navigasi ke menu "Key Management" → "Key Ceremony" → "CER-2025-001"
 3. Di halaman key generation, system menampilkan security warning:
-   - ⚠️ **PERINGATAN KEAMANAN** ⚠️
+   - **PERINGATAN KEAMANAN**
    - "Mekanisme kontribusi via email ini tidak aman untuk production!"
    - "Seharusnya dilakukan secara fisik di secure room dengan pengawasan"
    - "Ini adalah simulasi untuk tujuan pembelajaran saja"
@@ -237,15 +237,15 @@ Dokumen ini berisi skenario pengujian khusus untuk Key Ceremony pada HSM Simulat
 - System handle expired links dan invalid contributions
 
 #### Security Features Validated:
-- ✅ Role-based access control (Administrator vs Custodian)
-- ✅ Unique contribution links dengan expiration
-- ✅ Strong passphrase complexity requirements
-- ✅ Asynchronous contribution tracking
-- ✅ Automatic master key generation
-- ✅ Secure email delivery mechanism
-- ✅ Real-time progress monitoring
-- ✅ Comprehensive audit logging
-- ✅ Educational security warnings
+- Role-based access control (Administrator vs Custodian)
+- Unique contribution links dengan expiration
+- Strong passphrase complexity requirements
+- Asynchronous contribution tracking
+- Automatic master key generation
+- Secure email delivery mechanism
+- Real-time progress monitoring
+- Comprehensive audit logging
+- Educational security warnings
 
 #### Role Responsibilities:
 - **Administrator**: Memulai ceremony, monitor progress, view reports

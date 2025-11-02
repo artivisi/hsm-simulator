@@ -10,7 +10,7 @@
 
 ## Findings Summary
 
-### ✅ **COMPLIANT**: Master Key Generation (LMK, TMK, ZMK)
+### ****COMPLIANT**: Master Key Generation (LMK, TMK, ZMK)
 
 **Status**: Fully compliant with new cryptographic standards
 
@@ -18,19 +18,19 @@
 ```java
 // Line 275: LMK Generation
 private MasterKey createBankLMK(Bank bank, Integer keySize) {
-    byte[] keyData = generateRandomKey(keySize);  // ✅ Uses AES KeyGenerator
+    byte[] keyData = generateRandomKey(keySize);  // **Uses AES KeyGenerator
     // ...
-    .keyFingerprint(generateFingerprint(keyData))  // ✅ SHA-256 (line 532)
-    .keyChecksum(generateChecksum(keyData))        // ✅ SHA-256 (line 543)
+    .keyFingerprint(generateFingerprint(keyData))  // **SHA-256 (line 532)
+    .keyChecksum(generateChecksum(keyData))        // **SHA-256 (line 543)
 }
 ```
 
 **Crypto Standards Used**:
-- ✅ **Key Generation**: `KeyGenerator.getInstance("AES")` with `SecureRandom`
-- ✅ **Key Size**: Configurable (default 256-bit)
-- ✅ **Fingerprint**: SHA-256 hash (24 chars)
-- ✅ **Checksum**: SHA-256 hash (16 chars)
-- ✅ **Generation Method**: "SECURE_RANDOM" (accurate)
+- ****Key Generation**: `KeyGenerator.getInstance("AES")` with `SecureRandom`
+- ****Key Size**: Configurable (default 256-bit)
+- ****Fingerprint**: SHA-256 hash (24 chars)
+- ****Checksum**: SHA-256 hash (16 chars)
+- ****Generation Method**: "SECURE_RANDOM" (accurate)
 
 **Applies To**:
 - LMK (Local Master Key) - Line 274
@@ -39,7 +39,7 @@ private MasterKey createBankLMK(Bank bank, Integer keySize) {
 
 ---
 
-### ❌ **NON-COMPLIANT**: Child Key Generation (TPK, TSK, ZPK, ZSK)
+### ****NON-COMPLIANT**: Child Key Generation (TPK, TSK, ZPK, ZSK)
 
 **Status**: Does NOT follow new cryptographic standards
 
@@ -49,11 +49,11 @@ private MasterKey createBankLMK(Bank bank, Integer keySize) {
 ```java
 // Line 352: TPK Generation - INCORRECT IMPLEMENTATION
 private MasterKey createTPK(MasterKey tmk, Terminal terminal, Integer keySize) {
-    byte[] keyData = generateRandomKey(keySize);  // ❌ WRONG: Should derive from TMK
+    byte[] keyData = generateRandomKey(keySize);  // **WRONG: Should derive from TMK
     // ...
-    .generationMethod("DERIVED")                  // ❌ MISLEADING: Not actually derived
-    .kdfIterations(0)                             // ❌ WRONG: Should be 100000
-    .kdfSalt("N/A")                               // ❌ WRONG: Should use terminal ID
+    .generationMethod("DERIVED")                  // **MISLEADING: Not actually derived
+    .kdfIterations(0)                             // **WRONG: Should be 100000
+    .kdfSalt("N/A")                               // **WRONG: Should use terminal ID
 }
 ```
 
@@ -96,14 +96,14 @@ public MasterKey generateTPK(UUID tmkId, UUID terminalId, String description) {
     Terminal terminal = terminalRepository.findById(terminalId)
         .orElseThrow(() -> new IllegalArgumentException("Terminal not found: " + terminalId));
 
-    // ✅ CORRECT: Derives key from parent using PBKDF2
+    // **CORRECT: Derives key from parent using PBKDF2
     byte[] keyData = deriveKeyFromParent(tmk.getKeyData(), "TPK", terminal.getTerminalId());
 
     MasterKey tpk = MasterKey.builder()
         .keyData(keyData)
-        .generationMethod("DERIVED")        // ✅ Accurate label
-        .kdfIterations(100000)              // ✅ PBKDF2 with 100k iterations
-        .kdfSalt(terminal.getTerminalId())  // ✅ Context-based salt
+        .generationMethod("DERIVED")        // **Accurate label
+        .kdfIterations(100000)              // **PBKDF2 with 100k iterations
+        .kdfSalt(terminal.getTerminalId())  // **Context-based salt
         // ...
         .build();
 
@@ -174,13 +174,13 @@ Copy `deriveKeyFromParent()` method into `KeyInitializationService` and update c
 
 | Key Type | Generation Method | KDF Used | Cryptographic Binding |
 |----------|------------------|----------|----------------------|
-| LMK | ✅ Random (Correct) | N/A | N/A (root key) |
-| TMK | ✅ Random (Correct) | N/A | N/A (root key) |
-| ZMK | ✅ Random (Correct) | N/A | N/A (root key) |
-| TPK | ❌ Random (Incorrect) | ❌ None | ❌ No binding to TMK |
-| TSK | ❌ Random (Incorrect) | ❌ None | ❌ No binding to TMK |
-| ZPK | ❌ Random (Incorrect) | ❌ None | ❌ No binding to ZMK |
-| ZSK | ❌ Random (Incorrect) | ❌ None | ❌ No binding to ZMK |
+| LMK | **Random (Correct) | N/A | N/A (root key) |
+| TMK | **Random (Correct) | N/A | N/A (root key) |
+| ZMK | **Random (Correct) | N/A | N/A (root key) |
+| TPK | **Random (Incorrect) | **None | **No binding to TMK |
+| TSK | **Random (Incorrect) | **None | **No binding to TMK |
+| ZPK | **Random (Incorrect) | **None | **No binding to ZMK |
+| ZSK | **Random (Incorrect) | **None | **No binding to ZMK |
 
 ### After Fix
 
@@ -197,7 +197,7 @@ The keys stored in the `master_keys` table are:
 - Used as **source material** for operational key derivation
 
 The actual **operational keys** used in PIN/MAC operations are:
-- ✅ **CORRECTLY** derived using PBKDF2 in runtime operations
+- ****CORRECTLY** derived using PBKDF2 in runtime operations
 - Generated by `KeyGenerationService.deriveOperationalKey()`
 - Cached in memory (not stored in database)
 - Context format: `"KEY_TYPE:BANK_ID:IDENTIFIER"`
@@ -216,7 +216,7 @@ byte[] pinKeyBytes = keyGenerationService.deriveOperationalKey(
 );
 ```
 
-**Status**: ✅ Operational key derivation is CORRECT
+**Status**: **Operational key derivation is CORRECT
 
 ---
 
@@ -225,16 +225,16 @@ byte[] pinKeyBytes = keyGenerationService.deriveOperationalKey(
 ### Summary
 
 **Compliant Areas** (3/7 key types):
-- ✅ LMK generation - AES-256, SHA-256, SecureRandom
-- ✅ TMK generation - AES-256, SHA-256, SecureRandom
-- ✅ ZMK generation - AES-256, SHA-256, SecureRandom
-- ✅ Operational key derivation - PBKDF2-SHA256 at runtime
+- **LMK generation - AES-256, SHA-256, SecureRandom
+- **TMK generation - AES-256, SHA-256, SecureRandom
+- **ZMK generation - AES-256, SHA-256, SecureRandom
+- **Operational key derivation - PBKDF2-SHA256 at runtime
 
 **Non-Compliant Areas** (4/7 key types):
-- ❌ TPK generation - Random instead of PBKDF2 derived from TMK
-- ❌ TSK generation - Random instead of PBKDF2 derived from TMK
-- ❌ ZPK generation - Random instead of PBKDF2 derived from ZMK
-- ❌ ZSK generation - Random instead of PBKDF2 derived from ZMK
+- **TPK generation - Random instead of PBKDF2 derived from TMK
+- **TSK generation - Random instead of PBKDF2 derived from TMK
+- **ZPK generation - Random instead of PBKDF2 derived from ZMK
+- **ZSK generation - Random instead of PBKDF2 derived from ZMK
 
 ### Priority
 
@@ -259,7 +259,7 @@ byte[] pinKeyBytes = keyGenerationService.deriveOperationalKey(
 ## Remediation Completed
 
 **Date**: October 30, 2025
-**Status**: ✅ **FULLY COMPLIANT**
+**Status**: ****FULLY COMPLIANT**
 
 ### Changes Implemented
 
@@ -316,22 +316,22 @@ All child key generation methods in `KeyInitializationService` have been refacto
 
 ### Verification
 
-- ✅ **Compilation**: Success (no errors)
-- ✅ **Crypto Standards**: All child keys now use PBKDF2-SHA256
-- ✅ **KDF Iterations**: 100,000 (correct)
-- ✅ **Context Binding**: Terminal ID / Bank Code used as salt
-- ✅ **Code Reuse**: Single source of truth (KeyOperationService)
+- ****Compilation**: Success (no errors)
+- ****Crypto Standards**: All child keys now use PBKDF2-SHA256
+- ****KDF Iterations**: 100,000 (correct)
+- ****Context Binding**: Terminal ID / Bank Code used as salt
+- ****Code Reuse**: Single source of truth (KeyOperationService)
 
 ### Final Status
 
 **All key types now compliant** (7/7):
-- ✅ LMK generation - AES-256, SHA-256, SecureRandom
-- ✅ TMK generation - AES-256, SHA-256, SecureRandom
-- ✅ ZMK generation - AES-256, SHA-256, SecureRandom
-- ✅ TPK generation - PBKDF2-SHA256 derived from TMK
-- ✅ TSK generation - PBKDF2-SHA256 derived from TMK
-- ✅ ZPK generation - PBKDF2-SHA256 derived from ZMK
-- ✅ ZSK generation - PBKDF2-SHA256 derived from ZMK
+- **LMK generation - AES-256, SHA-256, SecureRandom
+- **TMK generation - AES-256, SHA-256, SecureRandom
+- **ZMK generation - AES-256, SHA-256, SecureRandom
+- **TPK generation - PBKDF2-SHA256 derived from TMK
+- **TSK generation - PBKDF2-SHA256 derived from TMK
+- **ZPK generation - PBKDF2-SHA256 derived from ZMK
+- **ZSK generation - PBKDF2-SHA256 derived from ZMK
 
 **Key Hierarchy**: Now cryptographically bound (not just relational)
 
@@ -339,4 +339,4 @@ All child key generation methods in `KeyInitializationService` have been refacto
 
 **Audit Date**: October 30, 2025
 **Auditor**: Claude Code (Anthropic)
-**Status**: ✅ FULLY COMPLIANT - All cryptographic standards met
+**Status**: **FULLY COMPLIANT - All cryptographic standards met

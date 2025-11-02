@@ -2,7 +2,7 @@
 
 Dokumentasi ini menjelaskan prosedur lengkap untuk melakukan Key Ceremony pada HSM Simulator, termasuk inisialisasi master key dan pemulihan master key menggunakan mekanisme 2-of-3 threshold scheme.
 
-## 🎯 Overview
+## Overview
 
 ### Apa itu Key Ceremony?
 Key Ceremony adalah proses ceremonial untuk membuat dan mengelola master key HSM dengan multi-party participation. Pada HSM Simulator, proses ini disimulasikan menggunakan mekanisme asynchronous email-based untuk tujuan pembelajaran.
@@ -14,7 +14,7 @@ Key Ceremony adalah proses ceremonial untuk membuat dan mengelola master key HSM
 - **Interface**: Web-based dengan email communication
 - **Tujuan**: Pembelajaran dan demonstrasi konsep kriptografi
 
-### ⚠️ Penting: Peringatan Keamanan
+### PENTING: Peringatan Keamanan
 > **Mekanisme ini hanya untuk pembelajaran!**
 >
 > Pada environment production yang sebenarnya, Key Ceremony harus dilakukan:
@@ -25,7 +25,7 @@ Key Ceremony adalah proses ceremonial untuk membuat dan mengelola master key HSM
 
 ---
 
-## 👥 Role dan Tanggung Jawab
+## Role dan Tanggung Jawab
 
 ### 1. Administrator
 - **Responsibilities**:
@@ -117,7 +117,7 @@ graph TB
 
 ---
 
-## 🚀 Prosedur Inisialisasi Key Ceremony
+## Prosedur Inisialisasi Key Ceremony
 
 ### Step 1: Administrator Setup
 
@@ -189,7 +189,7 @@ Custodian C:
 System akan menampilkan peringatan keamanan:
 
 ```
-⚠️ PERINGATAN KEAMANAN ⚠️
+PERINGATAN KEAMANAN
 
 Mekanisme kontribusi via email ini tidak aman untuk production!
 Seharusnya dilakukan secara fisik di secure room dengan pengawasan.
@@ -329,18 +329,18 @@ System memiliki complexity requirements yang ketat:
 ```mermaid
 graph TD
     A[Passphrase Input] --> B{Length ≥ 16?}
-    B -->|No| C[❌ Too Short]
+    B -->|No| C[REJECT: Too Short]
     B -->|Yes| D{Contains Uppercase?}
-    D -->|No| E[❌ Missing Uppercase]
+    D -->|No| E[REJECT: Missing Uppercase]
     D -->|Yes| F{Contains Lowercase?}
-    F -->|No| G[❌ Missing Lowercase]
+    F -->|No| G[REJECT: Missing Lowercase]
     F -->|Yes| H{Contains Numbers?}
-    H -->|No| I[❌ Missing Numbers]
+    H -->|No| I[REJECT: Missing Numbers]
     H -->|Yes| J{Contains Special Chars?}
-    J -->|No| K[❌ Missing Special Characters]
+    J -->|No| K[REJECT: Missing Special Characters]
     J -->|Yes| L{Entropy Score ≥ 7.0?}
-    L -->|No| M[⚠️ Weak Passphrase]
-    L -->|Yes| N[✅ Strong Passphrase]
+    L -->|No| M[WARNING: Weak Passphrase]
+    L -->|Yes| N[ACCEPT: Strong Passphrase]
 
     style N fill:#e8f5e8
     style M fill:#fff3e0
@@ -378,7 +378,7 @@ System memberikan real-time feedback:
 3. Klik `Submit Contribution`
 4. System menampilkan success message:
    ```
-   ✅ Thank you! Your contribution has been recorded.
+   Thank you! Your contribution has been recorded.
 
    Contribution ID: CONT-A
    Timestamp: 2025-01-15T11:15:00Z
@@ -388,7 +388,7 @@ System memberikan real-time feedback:
 
 ---
 
-## 🔐 Automatic Master Key Generation
+## Automatic Master Key Generation
 
 ### Process Flow
 ```mermaid
@@ -505,7 +505,7 @@ Setiap key share berisi:
 
 ---
 
-## 📊 Administrator Monitoring
+## Administrator Monitoring
 
 ### Real-time Dashboard
 ```mermaid

@@ -109,21 +109,9 @@ This is an HSM (Hardware Security Module) simulator for educational purposes foc
 
 ### Database Migrations
 Located in `src/main/resources/db/migration/`:
-- **V1**: Creates comprehensive schema including:
-  - Key ceremony tables (key_ceremonies, ceremony_custodians, key_custodians, etc.)
-  - Banking infrastructure (banks, terminals)
-  - Unified master_keys table supporting all key types (HSM_MASTER_KEY, TMK, TPK, TSK, ZMK, ZPK, ZSK, LMK, KEK)
-  - Key hierarchy support (parent_key_id, rotated_from_key_id)
-  - Zone key exchange tracking (zone_key_exchanges)
-  - Key rotation history (key_rotation_history)
-  - Comprehensive audit logging (ceremony_audit_logs)
-
-- **V2**: Inserts four-party model sample data:
-  - 4 banks (2 Issuers, 1 Acquirer, 1 Switch)
-  - 5 terminals (2 ATMs, 2 POS, 1 MPOS)
-  - 3 key custodians
-  - 6 sample keys demonstrating hierarchy (TMK, TPK, ZMK, ZPK)
-  - 1 zone key exchange example
+- **V1__create_schema.sql**: Creates 14 tables including key_ceremonies, banks, terminals, master_keys (unified storage for all key types with hierarchy support), zone_key_exchanges, key_rotation_history, ceremony_audit_logs, users, generated_pins, generated_macs
+- **V2__insert_sample_data.sql**: Sample data (4 banks, 5 terminals, 3 custodians, default admin user, sample keys demonstrating hierarchy)
+- **V3__add_rotation_participants.sql**: Adds rotation_participants table for tracking individual terminal/bank update status during key rotation
 
 Flyway automatically runs migrations on application startup.
 
@@ -134,29 +122,23 @@ Flyway automatically runs migrations on application startup.
 - For development with hot reload, run `npm run build` separately
 
 ### Testing Strategy
-- **Unit Tests**: Standard JUnit 5 tests
-- **Integration Tests**: Use TestContainer with PostgreSQL for repository/service layer tests
+- **Unit Tests**: JUnit 5 (currently minimal coverage - 4 test files)
+- **Integration Tests**: TestContainer with PostgreSQL for isolated database testing
 - **E2E Tests**: Playwright with Page Object pattern in `src/test/java/com/artivisi/hsm/simulator/playwright/`
-  - `pages/`: Page object classes (e.g., `HomePage`, `BasePage`)
-  - `tests/`: Test classes (e.g., `HomePageTest`)
+- **Existing Tests**: PasswordHashTest, EmailServiceIntegrationTest, SampleDataGeneratorTest, SampleKeyGeneratorTest, HomePageTest
 
-## Important Configuration
+## Configuration
 
-### Database Connection
-Configured in `src/main/resources/application.properties`:
+### Database
 - URL: `jdbc:postgresql://localhost:5432/hsm_simulator`
-- Username: `hsm_user`
-- Password: `xK9m2pQ8vR5nF7tA1sD3wE6zY`
-
-### JPA Configuration
-- Hibernate DDL mode: `validate` (schema managed by Flyway)
-- SQL logging enabled in development
+- User: `hsm_user` / Password: `xK9m2pQ8vR5nF7tA1sD3wE6zY`
+- Hibernate DDL: `validate` (schema managed by Flyway)
 - JPA auditing enabled via `@EnableJpaAuditing`
 
 ### Thymeleaf
-- Template caching disabled for development
-- Layout Dialect enabled for template composition
-- Templates in `src/main/resources/templates/`
+- Template caching: disabled (development)
+- Layout Dialect: enabled
+- Templates: `src/main/resources/templates/`
 
 ## Development Workflows
 
@@ -183,52 +165,24 @@ Configured in `src/main/resources/application.properties`:
 
 ## Cryptographic Standards
 
-### Master Key Storage
-- **Algorithm**: AES-256
-- **Mode**: GCM with random IV for key wrapping/share encryption
-- **Fingerprints**: SHA-256 (not MD5)
-- **Checksums**: SHA-256 derived (not MD5)
-
-### Operational Key Derivation
-- **Method**: PBKDF2-SHA256 with context
-- **Iterations**: 100,000
-- **Context Format**: `"KEY_TYPE:BANK_ID:IDENTIFIER"`
-- **Key Sizes**:
-  - PIN operations: 128-bit (16 bytes)
-  - MAC operations: 128-bit or 256-bit
-  - Zone operations: 256-bit (32 bytes)
-- **No Truncation**: Keys are properly derived, not truncated from master keys
-
-### PIN Operations
-- **Encryption**: AES-128-CBC with random IV and PKCS5 padding
-- **IV Handling**: Random 16-byte IV prepended to ciphertext
+### Algorithms
+- **Master Keys**: AES-256-GCM (random IV, SHA-256 fingerprints/checksums)
+- **Operational Keys**: PBKDF2-SHA256 (100K iterations, context: `"KEY_TYPE:BANK_ID:IDENTIFIER"`)
+- **PIN Encryption**: AES-128-CBC (random IV prepended, PKCS5 padding)
 - **PIN Formats**: ISO-0, ISO-1, ISO-3, ISO-4 (ISO 9564-1:2002)
-- **PVV Calculation**: SHA-256(PIN + PAN), first 4 decimal digits
-
-### MAC Operations
-- **Default Algorithm**: AES-CMAC (NIST SP 800-38B)
-- **Output Lengths**: 64-bit (banking standard), 128-bit, 256-bit
-- **Alternative**: HMAC-SHA256 with configurable output
-- **Key Derivation**: Context-based PBKDF2 from TSK/ZSK master keys
-
-### Share Encryption (Key Ceremony)
-- **Algorithm**: AES-256-GCM
-- **Salt**: Random 32-byte salt per share (not fixed)
-- **Salt Storage**: Prepended to encrypted share data for offline recovery
-- **Format**: `[32-byte salt][encrypted share data]`
+- **PVV**: SHA-256(PIN + PAN), first 4 decimal digits
+- **MAC**: AES-CMAC (NIST SP 800-38B, default) or HMAC-SHA256 (64/128/256-bit output)
+- **Share Encryption**: AES-256-GCM (32-byte random salt prepended: `[salt][encrypted_share]`)
 
 ### Key Hierarchy
 ```
 Master Keys (AES-256) → Operational Keys (PBKDF2-derived)
-  ├─ LMK → PIN Storage Keys (AES-128)
+  ├─ LMK → PIN Storage (AES-128)
   ├─ TMK → TPK/TSK (AES-128)
   └─ ZMK → ZPK/ZSK (AES-256)
 ```
 
-### Key Caching
-- Derived operational keys cached in ConcurrentHashMap
-- Cache key format: `keyId:context`
-- Avoids re-derivation overhead for repeated operations
+Derived keys cached in ConcurrentHashMap (`keyId:context`) to avoid re-derivation overhead.
 
 ## Security Notes
 

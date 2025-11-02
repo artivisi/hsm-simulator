@@ -17,6 +17,7 @@ The HSM Simulator uses PostgreSQL 17 with Flyway migrations for version control.
 |---------|-------------|------|
 | V1 | Complete schema creation - all tables for HSM functionality | `V1__create_schema.sql` |
 | V2 | Sample data - banks, terminals, custodians, users | `V2__insert_sample_data.sql` |
+| V3 | Add rotation_participants table for tracking key rotation status | `V3__add_rotation_participants.sql` |
 
 **Note**: Schema uses `id_tablename` FK convention (e.g., `id_bank`, `id_key_ceremony`) instead of `tablename_id`.
 
@@ -50,6 +51,11 @@ erDiagram
     master_keys ||--o{ generated_macs : "generates"
     master_keys ||--o{ key_rotation_history : "old_key"
     master_keys ||--o{ key_rotation_history : "new_key"
+
+    %% Key Rotation Tracking
+    key_rotation_history ||--o{ rotation_participants : "tracks"
+    terminals ||--o{ rotation_participants : "participates"
+    banks ||--o{ rotation_participants : "participates"
 
     %% Tables Details
     key_ceremonies {
@@ -228,6 +234,23 @@ erDiagram
         varchar ip_address
         timestamp timestamp
         jsonb metadata
+    }
+
+    rotation_participants {
+        uuid id PK
+        uuid id_rotation FK
+        uuid id_terminal FK
+        uuid id_bank FK
+        varchar participant_type
+        varchar update_status
+        timestamp new_key_delivered_at
+        timestamp update_confirmed_at
+        varchar update_confirmed_by
+        int delivery_attempts
+        timestamp last_delivery_attempt
+        text failure_reason
+        timestamp created_at
+        timestamp updated_at
     }
 
     users {
@@ -620,7 +643,40 @@ Complete audit trail of cryptographic key rotation activities.
 
 ---
 
-### 13. ceremony_audit_logs
+### 13. rotation_participants
+
+Tracks individual participants (terminals/banks) in a key rotation process with pending/delivered/confirmed workflow.
+
+**Purpose**: Monitor which terminals and banks have successfully updated to rotated keys.
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| id | UUID | PRIMARY KEY | Unique participant record identifier |
+| id_rotation | UUID | FOREIGN KEY, NOT NULL | Reference to key_rotation_history |
+| id_terminal | UUID | FOREIGN KEY | Reference to terminal (if TERMINAL type) |
+| id_bank | UUID | FOREIGN KEY | Reference to bank (if BANK type) |
+| participant_type | VARCHAR(20) | NOT NULL, CHECK | TERMINAL or BANK |
+| update_status | VARCHAR(20) | NOT NULL, CHECK | PENDING, DELIVERED, CONFIRMED, FAILED, SKIPPED |
+| new_key_delivered_at | TIMESTAMP | | When new key was delivered |
+| update_confirmed_at | TIMESTAMP | | When update was confirmed |
+| update_confirmed_by | VARCHAR(100) | | User who confirmed update |
+| delivery_attempts | INTEGER | DEFAULT 0 | Number of delivery attempts |
+| last_delivery_attempt | TIMESTAMP | | Last attempt timestamp |
+| failure_reason | TEXT | | Reason for failure if FAILED |
+| created_at | TIMESTAMP | NOT NULL | Creation timestamp |
+| updated_at | TIMESTAMP | | Last update timestamp |
+
+**Indexes**:
+- `idx_rotation_participant_rotation` on `id_rotation`
+- `idx_rotation_participant_terminal` on `id_terminal`
+- `idx_rotation_participant_bank` on `id_bank`
+- `idx_rotation_participant_status` on `update_status`
+
+**Related Tables**: `key_rotation_history`, `terminals`, `banks`
+
+---
+
+### 14. ceremony_audit_logs
 
 Detailed audit logging for key ceremony activities.
 
@@ -644,7 +700,7 @@ Detailed audit logging for key ceremony activities.
 
 ---
 
-### 14. users
+### 15. users
 
 User authentication and authorization for HSM access control.
 
@@ -812,7 +868,7 @@ Enable WAL archiving in postgresql.conf for PITR capability.
 
 ### Sensitive Data
 
-⚠️ **Educational Simulator**: This database stores sensitive cryptographic material in software. Production HSM would:
+**WARNING - Educational Simulator**: This database stores sensitive cryptographic material in software. Production HSM would:
 
 1. **Never Store Clear Keys**: Key material protected by hardware security module
 2. **No Clear PINs**: PIN values never stored in clear text
@@ -881,7 +937,7 @@ mvn clean compile  # Flyway runs automatically
 
 ### Creating New Migration
 ```bash
-# Create file: src/main/resources/db/migration/V3__description.sql
+# Create file: src/main/resources/db/migration/V4__description.sql
 ```
 
 ### Migration Naming Convention
@@ -890,7 +946,8 @@ V{version}__{description}.sql
 Examples:
   V1__create_schema.sql
   V2__insert_sample_data.sql
-  V3__add_new_feature.sql
+  V3__add_rotation_participants.sql
+  V4__add_new_feature.sql
 ```
 
 ---

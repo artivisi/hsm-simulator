@@ -2,7 +2,7 @@
 
 Dokumentasi ini menjelaskan cara menggunakan fitur PIN Block Operations pada HSM Simulator untuk pembelajaran dan demonstrasi proses enkripsi PIN block yang digunakan dalam sistem perbankan.
 
-## 🎯 Overview
+## Overview
 
 ### Apa itu PIN Block?
 PIN Block adalah format standar industri untuk mengenkripsi Personal Identification Number (PIN) dalam transaksi perbankan. PIN block menggabungkan PIN pengguna dengan informasi kartu (PAN) untuk menghasilkan data terenkripsi yang aman.
@@ -256,7 +256,7 @@ graph LR
 
 ---
 
-## 📊 2. PIN Block Storage and Management
+## 2. PIN Block Storage and Management
 
 Penyimpanan dan manajemen PIN block dalam sistem perbankan. Ada dua metode utama untuk menyimpan data PIN:
 
@@ -324,11 +324,11 @@ Output: PVV (e.g., "5672")
 ```
 
 **Why PVV is Preferred:**
-- ✅ **More secure**: Cannot be reversed to obtain PIN
-- ✅ **Smaller storage**: 4 digits vs 32+ characters (90% reduction)
-- ✅ **Faster verification**: Simple 4-digit comparison
-- ✅ **Industry standard**: ISO 9564 compliant
-- ✅ **PCI-DSS compliant**: Meets payment card industry standards
+- **More secure**: Cannot be reversed to obtain PIN
+- **Smaller storage**: 4 digits vs 32+ characters (90% reduction)
+- **Faster verification**: Simple 4-digit comparison
+- **Industry standard**: ISO 9564 compliant
+- **PCI-DSS compliant**: Meets payment card industry standards
 
 ### 2.2 Storage Architecture
 
@@ -604,7 +604,7 @@ graph LR
 
 ---
 
-## 🔍 3. PIN Verification Methods
+## 3. PIN Verification Methods
 
 Sistem menyediakan dua metode verifikasi PIN dalam zona yang sama untuk memvalidasi kebenaran PIN.
 
@@ -759,7 +759,7 @@ graph LR
 
 ---
 
-## 🌐 4. Cross-Zone PIN Block Verification
+## 4. Cross-Zone PIN Block Verification
 
 Verifikasi PIN block antar zona yang berbeda dengan encryption keys yang berbeda.
 
@@ -933,7 +933,7 @@ Akses dari: **Educational Tools** → **Security Analysis**
 
 ---
 
-## ⚠️ 7. Error Handling
+## 7. Error Handling
 
 Penanganan error dan troubleshooting.
 

@@ -60,7 +60,7 @@ Examples:
 2. Compromise of one terminal doesn't affect others
 3. No key truncation occurs (full 256-bit entropy used)
 
-⚠️ **CRITICAL**: `BANK_UUID` must be the **actual database UUID** (e.g., `48a9e84c-ff57-4483-bf83-b255f34a6466`), **NOT** the string `"GLOBAL"` or bank code like `"ISS001"`.
+**WARNING**: **CRITICAL**: `BANK_UUID` must be the **actual database UUID** (e.g., `48a9e84c-ff57-4483-bf83-b255f34a6466`), **NOT** the string `"GLOBAL"` or bank code like `"ISS001"`.
 
 #### TPK/TSK Derivation Context: Bank UUID vs Terminal ID
 
@@ -68,10 +68,10 @@ Examples:
 
 | Aspect | Uses Terminal ID | Uses Bank UUID |
 |--------|------------------|----------------|
-| **Master Key Generation** | ✅ `kdfSalt` field stores terminal ID (e.g., `"TRM-ISS001-ATM-001"`) | ✅ `idBank` field stores bank UUID |
-| **Master Key Identification** | ✅ `masterKeyId` includes terminal ID (e.g., `"TPK-TRM-ISS001-ATM-001"`) | - |
-| **Database Associations** | ✅ `idTerminal` foreign key | ✅ `idBank` foreign key |
-| **Operational Key Derivation** | ❌ **NOT USED** | ✅ **REQUIRED** in context string |
+| **Master Key Generation** | **`kdfSalt` field stores terminal ID (e.g., `"TRM-ISS001-ATM-001"`) | **`idBank` field stores bank UUID |
+| **Master Key Identification** | **`masterKeyId` includes terminal ID (e.g., `"TPK-TRM-ISS001-ATM-001"`) | - |
+| **Database Associations** | **`idTerminal` foreign key | **`idBank` foreign key |
+| **Operational Key Derivation** | ****NOT USED** | ****REQUIRED** in context string |
 
 **Why This Matters:**
 
@@ -82,11 +82,11 @@ The confusion arises because:
 ```java
 // WRONG: Using terminal ID in derivation context
 String terminalId = "TRM-ISS001-ATM-001";
-String wrongContext = "TPK:" + terminalId + ":PIN";  // ❌ WILL FAIL!
+String wrongContext = "TPK:" + terminalId + ":PIN";  // **WILL FAIL!
 
 // CORRECT: Using bank UUID in derivation context
 UUID bankUuid = UUID.fromString("48a9e84c-ff57-4483-bf83-b255f34a6466");
-String correctContext = "TPK:" + bankUuid + ":PIN";  // ✅ WORKS
+String correctContext = "TPK:" + bankUuid + ":PIN";  // **WORKS
 ```
 
 **Real-World Impact After Key Rotation:**
@@ -102,11 +102,11 @@ Before Rotation:
 
 After Rotation (if bank/terminal IDs missing):
   Master Key: TPK-TRMISS001ATM001-4B6E3217
-  - idBank: NULL ❌
-  - idTerminal: NULL ❌
+  - idBank: NULL (INCORRECT)
+  - idTerminal: NULL (INCORRECT)
   - kdfSalt: "TRM-ISS001-ATM-001" ✓
-  Context: "TPK:GLOBAL:PIN" ❌ (fallback due to NULL idBank)
-  Result: PIN decryption FAILS ❌ BadPaddingException
+  Context: "TPK:GLOBAL:PIN" **(fallback due to NULL idBank)
+  Result: PIN decryption FAILS **BadPaddingException
 ```
 
 **Client Requirements:**
@@ -211,21 +211,21 @@ Content-Type: application/json
 
 ## Client-Side Key Derivation (REQUIRED)
 
-**⚠️ CRITICAL REQUIREMENT**: Clients performing cryptographic operations (PIN encryption, MAC generation) **MUST derive operational keys** from master keys. **Never use master keys directly!**
+****WARNING**: CRITICAL REQUIREMENT**: Clients performing cryptographic operations (PIN encryption, MAC generation) **MUST derive operational keys** from master keys. **Never use master keys directly!**
 
 #### Why Key Derivation is Required
 
 | Scenario | Master Key | Operational Key | Result |
 |----------|-----------|-----------------|--------|
-| ❌ **Wrong** | 32-byte TPK (AES-256) | **Use directly** | BadPaddingException, decryption fails |
-| ✅ **Correct** | 32-byte TPK (AES-256) | **Derive 16-byte key** via PBKDF2 | Successful encryption/decryption |
+| ****Wrong** | 32-byte TPK (AES-256) | **Use directly** | BadPaddingException, decryption fails |
+| ****Correct** | 32-byte TPK (AES-256) | **Derive 16-byte key** via PBKDF2 | Successful encryption/decryption |
 
 #### Why PBKDF2 Instead of Simple Truncation?
 
 **Question**: Why not just truncate the 32-byte master key to 16 bytes?
 
 ```java
-// ❌ Why is this WRONG and INSECURE?
+// **Why is this WRONG and INSECURE?
 byte[] tpkMasterKey = hexToBytes(tpkMasterKeyHex); // 32 bytes
 byte[] operationalKey = Arrays.copyOf(tpkMasterKey, 16); // Just take first 16 bytes
 ```
@@ -234,8 +234,8 @@ byte[] operationalKey = Arrays.copyOf(tpkMasterKey, 16); // Just take first 16 b
 
 | Approach | Security Issues | Mitigation via PBKDF2 |
 |----------|----------------|----------------------|
-| **Simple Truncation** | • No domain separation (PIN key = MAC key if same master key)<br>• Predictable relationship between master and operational keys<br>• No computational barrier to brute-force<br>• Same key across different contexts | ✅ Context-based derivation creates unique keys per purpose<br>✅ One-way function prevents master key recovery<br>✅ 100,000 iterations add computational cost<br>✅ Different contexts yield cryptographically independent keys |
-| **Direct Use (32-byte)** | • Key size mismatch with HSM's operational key size<br>• HSM expects AES-128 (16 bytes) for PIN/MAC ops<br>• Decryption failure due to wrong key | ✅ Consistent 16-byte operational keys<br>✅ Matches HSM's derived key exactly<br>✅ Successful encryption/decryption |
+| **Simple Truncation** | • No domain separation (PIN key = MAC key if same master key)<br>• Predictable relationship between master and operational keys<br>• No computational barrier to brute-force<br>• Same key across different contexts | **Context-based derivation creates unique keys per purpose<br>**One-way function prevents master key recovery<br>**100,000 iterations add computational cost<br>**Different contexts yield cryptographically independent keys |
+| **Direct Use (32-byte)** | • Key size mismatch with HSM's operational key size<br>• HSM expects AES-128 (16 bytes) for PIN/MAC ops<br>• Decryption failure due to wrong key | **Consistent 16-byte operational keys<br>**Matches HSM's derived key exactly<br>**Successful encryption/decryption |
 
 **Real-World Impact:**
 
@@ -243,12 +243,12 @@ byte[] operationalKey = Arrays.copyOf(tpkMasterKey, 16); // Just take first 16 b
 // Example: Bank ISS001 has TPK master key
 byte[] tpkMaster = hexToBytes("246A31D7..."); // 32 bytes
 
-// ❌ INSECURE: Simple truncation
+// **INSECURE: Simple truncation
 byte[] pinKey = Arrays.copyOf(tpkMaster, 16);
 byte[] macKey = Arrays.copyOf(tpkMaster, 16);
 // Result: pinKey == macKey (SAME KEY FOR DIFFERENT PURPOSES!)
 
-// ✅ SECURE: PBKDF2 with different contexts
+// **SECURE: PBKDF2 with different contexts
 byte[] pinKey = deriveKey(tpkMaster, "TPK:48a9e84c...:PIN", 128);
 byte[] macKey = deriveKey(tpkMaster, "TPK:48a9e84c...:MAC", 128);
 // Result: pinKey ≠ macKey (cryptographically independent)
@@ -383,7 +383,7 @@ hsm.bank.uuid=48a9e84c-ff57-4483-bf83-b255f34a6466
 
 #### Common Mistakes to Avoid
 
-| ❌ Wrong | ✅ Correct |
+| **Wrong | **Correct |
 |---------|-----------|
 | Use master key directly for encryption | Derive operational key first |
 | Context: `"TPK:GLOBAL:PIN"` | Context: `"TPK:48a9e84c...:PIN"` (actual UUID) |
@@ -570,14 +570,14 @@ public class PinEncryption {
 
 ### Client-Side MAC Key Derivation (REQUIRED)
 
-**⚠️ CRITICAL REQUIREMENT**: Just like PIN operations, MAC generation/verification **MUST use derived operational keys** from TSK (Terminal Security Key) master key. **Never use TSK master key directly!**
+****WARNING**: CRITICAL REQUIREMENT**: Just like PIN operations, MAC generation/verification **MUST use derived operational keys** from TSK (Terminal Security Key) master key. **Never use TSK master key directly!**
 
 #### Key Derivation for MAC Operations
 
 | Scenario | TSK Master Key | MAC Operational Key | Result |
 |----------|---------------|---------------------|--------|
-| ❌ **Wrong** | 32-byte TSK (AES-256) | **Use directly** | MAC mismatch, verification fails |
-| ✅ **Correct** | 32-byte TSK (AES-256) | **Derive 16-byte key** via PBKDF2 | Successful MAC generation/verification |
+| ****Wrong** | 32-byte TSK (AES-256) | **Use directly** | MAC mismatch, verification fails |
+| ****Correct** | 32-byte TSK (AES-256) | **Derive 16-byte key** via PBKDF2 | Successful MAC generation/verification |
 
 **Why Not Simple Truncation for MAC Keys?**
 
@@ -591,12 +591,12 @@ Just like PIN operations, **PBKDF2 derivation is required instead of truncation*
 **Example of the Problem:**
 
 ```python
-# ❌ INSECURE: Truncation means same key for all purposes
+# **INSECURE: Truncation means same key for all purposes
 tsk_master = bytes.fromhex("3AC63878...")  # 32 bytes
 mac_key = tsk_master[:16]  # Just take first 16 bytes
 enc_key = tsk_master[:16]  # SAME KEY - security violation!
 
-# ✅ SECURE: PBKDF2 creates different keys per context
+# **SECURE: PBKDF2 creates different keys per context
 mac_key = derive_key(tsk_master, "TSK:48a9e84c...:MAC", 128)
 enc_key = derive_key(tsk_master, "TSK:48a9e84c...:ENC", 128)
 # Result: mac_key ≠ enc_key (cryptographically independent)
@@ -615,7 +615,7 @@ Output: 16 bytes (128 bits) for AES-CMAC operations
 Context = "TSK:48a9e84c-ff57-4483-bf83-b255f34a6466:MAC"
 ```
 
-⚠️ **CRITICAL**: Use the **actual database UUID** of the bank (e.g., `48a9e84c-ff57-4483-bf83-b255f34a6466`), **NOT** `"GLOBAL"` or bank code like `"ISS001"`.
+**WARNING**: **CRITICAL**: Use the **actual database UUID** of the bank (e.g., `48a9e84c-ff57-4483-bf83-b255f34a6466`), **NOT** `"GLOBAL"` or bank code like `"ISS001"`.
 
 ### AES-CMAC Implementation (Client Side)
 
@@ -701,10 +701,10 @@ String tskMasterKeyHex = "3AC638783EF600FE5E25E8A2EE5B0D222EB810DDF64C3681DD11AF
 String bankUuid = "48a9e84c-ff57-4483-bf83-b255f34a6466";
 String message = "0800822000000000000004000000000000000000001234567890123456";
 
-// ❌ WRONG: Using master key directly
+// **WRONG: Using master key directly
 // String mac = calculateAesCmac(hexToBytes(tskMasterKeyHex), message, 8);
 
-// ✅ CORRECT: Derive operational key first
+// **CORRECT: Derive operational key first
 String mac = generateMac(tskMasterKeyHex, bankUuid, message);
 ```
 
@@ -788,16 +788,16 @@ tsk_master_key_hex = "3AC638783EF600FE5E25E8A2EE5B0D222EB810DDF64C3681DD11AFEFAF
 bank_uuid = "48a9e84c-ff57-4483-bf83-b255f34a6466"
 message = "0800822000000000000004000000000000000000001234567890123456"
 
-# ❌ WRONG: Using master key directly
+# **WRONG: Using master key directly
 # mac = calculate_aes_cmac(bytes.fromhex(tsk_master_key_hex), message, 8)
 
-# ✅ CORRECT: Derive operational key first
+# **CORRECT: Derive operational key first
 mac = generate_mac(tsk_master_key_hex, bank_uuid, message)
 ```
 
 #### Common MAC Key Derivation Mistakes
 
-| ❌ Wrong | ✅ Correct |
+| **Wrong | **Correct |
 |---------|-----------|
 | Use TSK master key (32 bytes) directly | Derive 16-byte operational key via PBKDF2 |
 | Context: `"TSK:GLOBAL:MAC"` | Context: `"TSK:48a9e84c...:MAC"` (actual UUID) |
@@ -1457,13 +1457,13 @@ if __name__ == "__main__":
 
 **Security Warnings:**
 
-❌ **DO NOT**:
+****DO NOT**:
 - Store decrypted keys in plaintext memory for extended periods
 - Skip checksum verification
 - Confirm installation before testing new key
 - Ignore rotation requests indefinitely
 
-✅ **DO**:
+****DO**:
 - Use derived operational keys (never use master keys directly)
 - Verify checksums before and after decryption
 - Test new keys thoroughly before confirming
@@ -1559,10 +1559,10 @@ UUID rotationId = response.getRotationId();
 String rotationIdString = response.getRotationIdString(); // e.g., "ROT-TPK-93CAFC76"
 
 // Step 2: Confirm with correct ID
-hsmClient.confirmKeyUpdate(terminalId, rotationId);  // ✅ Works
+hsmClient.confirmKeyUpdate(terminalId, rotationId);  // **Works
 
 // WRONG: Constructing ID from key names
-String wrongId = terminalId + "-TPK-v2";  // ❌ Will fail
+String wrongId = terminalId + "-TPK-v2";  // **Will fail
 hsmClient.confirmKeyUpdate(terminalId, wrongId);
 ```
 
@@ -1594,7 +1594,7 @@ log.debug("Derivation context: TPK:{}:PIN", masterKey.getBankId());
 KeySpec spec = new PBEKeySpec(
     context.toCharArray(),
     masterKeyBytes,
-    100000,  // ✅ Correct
+    100000,  // **Correct
     outputBits
 );
 ```
@@ -1603,7 +1603,7 @@ KeySpec spec = new PBEKeySpec(
 ```java
 // PIN operations use 128-bit (16 bytes)
 byte[] operationalKey = deriveKey(masterKey, context, 128);
-assertEquals(16, operationalKey.length);  // ✅ Correct
+assertEquals(16, operationalKey.length);  // **Correct
 ```
 
 4. **Compare Derived Keys (for testing only):**
@@ -1699,14 +1699,14 @@ curl -X POST http://localhost:8080/api/hsm/mac/generate \
 
 ### 1. Key Management
 
-✅ **DO:**
+****DO:**
 - Use Key Ceremony for production master key generation
 - Rotate keys according to your security policy
 - Store key IDs, not key material, in application databases
 - Use unique contexts for key derivation
 - Implement proper key lifecycle management (ACTIVE, SUSPENDED, REVOKED)
 
-❌ **DON'T:**
+****DON'T:**
 - Hardcode key material in your application
 - Reuse the same key for multiple purposes
 - Transmit unencrypted key material over the network
@@ -1715,14 +1715,14 @@ curl -X POST http://localhost:8080/api/hsm/mac/generate \
 
 ### 2. PIN Security
 
-✅ **DO:**
+****DO:**
 - Always use PVV (PIN Verification Value) for PIN verification
 - Use ISO-0 format for PAN-based PIN blocks
 - Implement PIN retry limits (3-5 attempts)
 - Use TLS for all PIN transmission
 - Log PIN verification attempts
 
-❌ **DON'T:**
+****DON'T:**
 - Store clear PINs anywhere
 - Log PIN values (encrypted or clear)
 - Transmit PINs without encryption
@@ -1731,14 +1731,14 @@ curl -X POST http://localhost:8080/api/hsm/mac/generate \
 
 ### 3. MAC Security
 
-✅ **DO:**
+****DO:**
 - Use AES-CMAC for new implementations
 - Include transaction timestamp in MAC calculation
 - Implement MAC verification on all critical operations
 - Use separate MAC keys for different message types
 - Log MAC verification failures
 
-❌ **DON'T:**
+****DON'T:**
 - Reuse MACs across different messages
 - Skip MAC verification
 - Use deprecated algorithms (DES, MD5)
@@ -1747,14 +1747,14 @@ curl -X POST http://localhost:8080/api/hsm/mac/generate \
 
 ### 4. Network Security
 
-✅ **DO:**
+****DO:**
 - Always use TLS 1.2 or higher
 - Implement mutual TLS for production
 - Use certificate pinning where possible
 - Implement rate limiting
 - Monitor for unusual patterns
 
-❌ **DON'T:**
+****DON'T:**
 - Expose HSM API directly to the internet
 - Skip certificate validation
 - Use self-signed certificates in production
@@ -1762,14 +1762,14 @@ curl -X POST http://localhost:8080/api/hsm/mac/generate \
 
 ### 5. Error Handling
 
-✅ **DO:**
+****DO:**
 - Return generic error messages to clients
 - Log detailed errors server-side
 - Implement retry logic with exponential backoff
 - Validate all inputs before sending to HSM
 - Handle timeout scenarios gracefully
 
-❌ **DON'T:**
+****DON'T:**
 - Expose internal error details to clients
 - Retry indefinitely
 - Skip input validation

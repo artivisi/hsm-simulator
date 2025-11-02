@@ -230,12 +230,12 @@ graph LR
 ### Prerequisites
 - HSM Simulator sudah terinstall dan dijalankan
 - Browser web untuk mengakses interface web
-- Akses ke aplikasi web HSM Simulator (biasanya http://localhost:3000)
+- Akses ke aplikasi web HSM Simulator (biasanya http://localhost:8080)
 
 ### Langkah-langkah Simulasi via Web Interface
 
 #### 1. Setup Zone Master Key
-1. Buka browser dan akses http://localhost:3000
+1. Buka browser dan akses http://localhost:8080
 2. Login dengan credentials yang telah disediakan
 3. Navigate ke menu **Zone Management** → **Zone Master Keys**
 4. Klik tombol **Generate New ZMK**
