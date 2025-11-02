@@ -153,6 +153,297 @@ docker compose down
 
 See [DATABASE.md](docs/DATABASE.md) for ERD and details.
 
+## Sample Keys Guide
+
+The V2 migration (`V2__insert_sample_data.sql`) creates 6 pre-generated keys for immediate testing. These keys demonstrate the complete key hierarchy and enable PIN/MAC operations without running a key ceremony.
+
+### Sample Keys Overview
+
+| Key ID | Type | Purpose | Parent | Storage Location |
+|--------|------|---------|--------|------------------|
+| LMK-ISS001-SAMPLE | LMK | PIN storage encryption in database | - | HSM/Database only |
+| TMK-ISS001-SAMPLE | TMK | Master key for terminal key distribution | - | HSM only |
+| TPK-TRM-ISS001-ATM-001 | TPK | PIN encryption at ATM terminal | TMK | ATM Terminal (encrypted under TMK) |
+| TSK-TRM-ISS001-ATM-001 | TSK | MAC generation at ATM terminal | TMK | ATM Terminal (encrypted under TMK) |
+| ZMK-ISS001-ACQ001 | ZMK | Inter-bank key exchange | - | Both bank HSMs |
+| ZPK-ISS001-ACQ001 | ZPK | Inter-bank PIN translation | ZMK | Both bank HSMs |
+
+### Key Generation Details
+
+**Master Keys (LMK, TMK):**
+- Algorithm: AES-256
+- Generation: `KeyGenerator.getInstance("AES")` with `SecureRandom`
+- Storage: Direct binary storage in `master_keys.key_data`
+- Fingerprint: SHA-256 hash (24 chars)
+- Checksum: SHA-256 derived (16 chars)
+
+**Derived Keys (TPK, TSK):**
+- Algorithm: AES-256 derived to operational size
+- Generation: PBKDF2-SHA256 with 100,000 iterations
+- Context: `"TPK:48a9e84c-ff57-4483-bf83-b255f34a6466:TRM-ISS001-ATM-001"`
+- Parent: TMK-ISS001-SAMPLE
+- KDF Salt: Terminal ID (e.g., `TRM-ISS001-ATM-001`)
+
+### Testing with Sample Keys
+
+**PIN Encryption Test:**
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/encrypt \
+  -H "Content-Type: application/json" \
+  -d '{
+    "pan": "4111111111111111",
+    "pin": "1234",
+    "keyId": "TPK-TRM-ISS001-ATM-001",
+    "format": "ISO_0"
+  }'
+```
+
+**MAC Generation Test:**
+```bash
+curl -X POST http://localhost:8080/api/hsm/mac/generate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "data": "Test transaction data",
+    "keyId": "TSK-TRM-ISS001-ATM-001",
+    "algorithm": "AES_CMAC"
+  }'
+```
+
+**Sample Data Included:**
+- Pre-encrypted PIN: PAN `4111111111111111`, PIN `1234`, PVV `0187`
+- Pre-generated MAC for message verification
+- Ready for immediate API testing
+
+### Regenerating Sample Keys
+
+Sample keys can be regenerated using test classes:
+- `SampleKeyGeneratorTest.java` - Generates cryptographic keys
+- `SampleDataGeneratorTest.java` - Generates encrypted PINs and MACs
+
+## Key Storage & Distribution Architecture
+
+### ATM Host (Bank HSM)
+
+**Keys Stored:**
+- LMK: PIN storage encryption (never leaves HSM)
+- TMK: Terminal master key (never leaves HSM)
+- ZMK: Zone master key for inter-bank communication
+- ZPK: Zone PIN key (derived from ZMK)
+
+**Operations:**
+- Generate TPK/TSK from TMK using PBKDF2
+- Encrypt TPK/TSK under TMK for terminal distribution
+- Store customer PINs encrypted under LMK
+- Translate PINs between encryption domains (TPK↔ZPK↔LMK)
+
+**Storage Format:**
+```
+master_keys table:
+├── LMK-ISS001-SAMPLE (key_data: raw AES-256 bytes)
+├── TMK-ISS001-SAMPLE (key_data: raw AES-256 bytes)
+└── ZMK-ISS001-ACQ001 (key_data: raw AES-256 bytes)
+```
+
+### ATM Terminal
+
+**Keys Received (encrypted under TMK):**
+- TPK: Decrypted locally, used for PIN block encryption
+- TSK: Decrypted locally, used for MAC generation
+
+**Keys NOT Stored:**
+- TMK: Never transmitted to or stored in terminal
+- LMK: Remains only in bank HSM
+
+**Operations:**
+1. **PIN Entry**: Customer enters PIN
+2. **PIN Block Creation**: Format PIN with PAN (ISO-0/1/3/4)
+3. **Encryption**: Encrypt PIN block using TPK
+4. **MAC Generation**: Generate MAC using TSK
+5. **Transmission**: Send encrypted PIN block + MAC to host
+
+**Terminal Storage (Secure Crypto Processor):**
+```
+Terminal Memory (volatile):
+├── TPK (AES-128/256, decrypted from TMK-encrypted delivery)
+└── TSK (AES-128/256, decrypted from TMK-encrypted delivery)
+
+Terminal Does NOT Store:
+├── TMK (only used during key injection, then erased)
+├── Clear PINs (never stored)
+└── LMK (bank-side only)
+```
+
+### Key Distribution Flow
+
+```
+Step 1: TMK Injection (Physical/Secure Channel)
+  Bank → [TMK encrypted under KEK] → Terminal
+  Terminal decrypts and stores TMK temporarily
+
+Step 2: Working Key Distribution (Over Network)
+  Bank HSM:
+    - Derive TPK from TMK (PBKDF2)
+    - Encrypt TPK under TMK
+    - Send encrypted TPK to terminal
+
+  Terminal:
+    - Decrypt TPK using stored TMK
+    - Store TPK in secure memory
+    - Erase TMK after key loading complete
+
+Step 3: PIN Transaction
+  Terminal:
+    - Encrypt PIN block with TPK
+    - Generate MAC with TSK
+    - Send to bank
+
+  Bank HSM:
+    - Verify MAC with TSK
+    - Decrypt PIN block with TPK (or translate to LMK)
+    - Verify PIN against stored value
+```
+
+### Key Hierarchy in Practice
+
+**Bank ISS001 Key Structure:**
+```
+LMK-ISS001 (PIN storage)
+  └── [PINs encrypted at rest]
+
+TMK-ISS001 (Terminal master)
+  ├── TPK-TRM-ISS001-ATM-001 (Terminal 1 PIN key)
+  ├── TSK-TRM-ISS001-ATM-001 (Terminal 1 security key)
+  ├── TPK-TRM-ISS001-ATM-002 (Terminal 2 PIN key)
+  └── TSK-TRM-ISS001-ATM-002 (Terminal 2 security key)
+
+ZMK-ISS001-ACQ001 (Inter-bank master)
+  └── ZPK-ISS001-ACQ001 (Inter-bank PIN key)
+```
+
+**Terminal TRM-ISS001-ATM-001 Key Structure:**
+```
+Secure Crypto Processor:
+├── TPK (for encrypting customer PINs)
+└── TSK (for message authentication)
+
+Operations:
+├── PIN Entry → Encrypt with TPK → Send to bank
+├── Transaction → Generate MAC with TSK → Send to bank
+└── Key Update → Receive new TPK/TSK encrypted under TMK
+```
+
+## Zone Key Usage
+
+Zone keys enable secure communication between different banks (zones) in the payment network.
+
+### Zone Key Types
+
+**ZMK (Zone Master Key):**
+- Purpose: Encrypt key exchange between banks
+- Usage: Protect ZPK/ZSK during distribution
+- Storage: Both participating banks' HSMs
+- Example: `ZMK-ISS001-ACQ001` shared between Issuer and Acquirer
+
+**ZPK (Zone PIN Key):**
+- Purpose: Encrypt PIN blocks in inter-bank transactions
+- Usage: PIN translation between banks
+- Derivation: From ZMK using PBKDF2
+- Example: Acquirer translates PIN from TPK to ZPK for forwarding to Issuer
+
+**ZSK (Zone Session Key):**
+- Purpose: Encrypt transaction messages between banks
+- Usage: Message encryption, MAC generation for inter-bank traffic
+- Derivation: From ZMK using PBKDF2
+- Example: Settlement data encryption between banks
+
+### Inter-Bank PIN Translation Flow
+
+**Scenario:** Customer uses Issuer Bank card at Acquirer Bank ATM
+
+```
+1. PIN Entry at Acquirer ATM:
+   Customer → [PIN: 1234] → ATM Terminal
+   ATM → Encrypt with TPK-ACQ → [PIN Block A]
+
+2. Acquirer PIN Translation (TPK → ZPK):
+   Acquirer HSM:
+     - Decrypt PIN block with TPK-ACQ
+     - Re-encrypt with ZPK-ACQ-ISS
+     - Result: [PIN Block B] (same PIN, different encryption)
+
+3. Network Transmission:
+   Acquirer → [PIN Block B + Transaction] → Network → Issuer
+
+4. Issuer PIN Translation (ZPK → LMK):
+   Issuer HSM:
+     - Decrypt PIN block with ZPK-ACQ-ISS
+     - Re-encrypt with LMK-ISS (for comparison)
+     - Or: Extract clear PIN and verify against PVV
+
+5. Verification:
+   Issuer HSM:
+     - Compare with stored encrypted PIN (Method A)
+     - Or: Verify against stored PVV (Method B)
+     - Return approval/denial
+```
+
+### Zone Key Distribution
+
+**Initial Setup:**
+```bash
+# Step 1: Acquirer generates ZMK
+curl -X POST http://localhost:8080/api/hsm/key/generate \
+  -d '{"keyType": "ZMK", "bankCode": "ACQ001"}'
+
+# Step 2: Acquirer encrypts ZMK under Issuer's KEK
+# (In production: secure key exchange ceremony)
+
+# Step 3: Both banks derive ZPK from shared ZMK
+# Context: "ZPK:ACQ001:ISS001"
+# Both banks get identical ZPK for PIN translation
+```
+
+### Zone Key Usage Examples
+
+**PIN Translation (TPK → ZPK):**
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/translate/tpk-to-zpk \
+  -d '{
+    "encryptedPinBlock": "...",
+    "pan": "4111111111111111",
+    "sourceKeyId": "TPK-TRM-ACQ001-ATM-001",
+    "targetKeyId": "ZPK-ACQ001-ISS001"
+  }'
+```
+
+**PIN Translation (ZPK → LMK):**
+```bash
+curl -X POST http://localhost:8080/api/hsm/pin/translate/zpk-to-lmk \
+  -d '{
+    "encryptedPinBlock": "...",
+    "pan": "4111111111111111",
+    "sourceKeyId": "ZPK-ACQ001-ISS001",
+    "targetKeyId": "LMK-ISS001"
+  }'
+```
+
+### Zone Key Security
+
+**Key Isolation:**
+- Each bank pair has unique ZMK/ZPK
+- ZMK-ACQ001-ISS001 ≠ ZMK-ACQ001-SWT001
+- Compromise of one zone key doesn't affect others
+
+**Key Rotation:**
+- Zone keys rotated periodically (30-90 days)
+- Coordination required between both banks
+- Old keys retained for grace period
+
+**Access Control:**
+- Zone keys never leave HSM boundary
+- PIN never in clear during translation
+- All operations logged in audit trail
+
 ## Project Structure
 
 ```
