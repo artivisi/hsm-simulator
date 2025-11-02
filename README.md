@@ -500,10 +500,11 @@ npm install && npm run build  # Manual compile
 
 ## License
 
-MIT License
+Apache License 2.0 - See [LICENSE](LICENSE) file for details.
 
 ## Credits
 
-Developed with assistance from GLM-4.5 by Z.ai and Claude Code by Anthropic.
+[![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-5A67D8?logo=anthropic&logoColor=white)](https://claude.ai/code)
+[![Assisted by GLM-4.5](https://img.shields.io/badge/Assisted%20by-GLM--4.5-4285F4?logo=ai&logoColor=white)](https://www.zhipuai.cn/)
 
 ⚠️ **Disclaimer**: Educational simulator only. Not verified for production use. Contains plaintext credentials and clear PINs for educational purposes.
