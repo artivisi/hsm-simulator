@@ -256,40 +256,52 @@
             </div>
             <div class="p-6">
                 <div class="space-y-4">
-                    <!-- PVV Calculation Steps -->
+                    <!-- PVV Calculation Steps (Visa PVV Algorithm, AES adaptation) -->
                     <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 1: Concatenate PIN + PAN</p>
+                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 1: Build TSP (Transformed Security Parameter)</p>
                         <div class="bg-white rounded-lg p-4 space-y-2">
                             <div class="flex items-center gap-2">
-                                <p class="text-xs font-medium text-indigo-700 w-24">PIN:</p>
-                                <code class="px-3 py-2 bg-green-100 border border-green-300 rounded text-green-900 font-mono font-bold" th:text="${pin.clearPin}"></code>
+                                <p class="text-xs font-medium text-indigo-700 w-40">PAN (11 rightmost excl. check digit):</p>
+                                <code class="px-3 py-2 bg-purple-100 border border-purple-300 rounded text-purple-900 font-mono font-bold"
+                                      th:text="${#strings.substring(#strings.substring(pin.accountNumber, 0, #strings.length(pin.accountNumber) - 1), #strings.length(pin.accountNumber) - 12)}"></code>
                             </div>
                             <div class="text-center text-indigo-600 font-bold">+</div>
                             <div class="flex items-center gap-2">
-                                <p class="text-xs font-medium text-indigo-700 w-24">PAN:</p>
-                                <code class="px-3 py-2 bg-purple-100 border border-purple-300 rounded text-purple-900 font-mono font-bold" th:text="${pin.accountNumber}"></code>
+                                <p class="text-xs font-medium text-indigo-700 w-40">PVKI (Key Indicator):</p>
+                                <code class="px-3 py-2 bg-yellow-100 border border-yellow-300 rounded text-yellow-900 font-mono font-bold">1</code>
+                            </div>
+                            <div class="text-center text-indigo-600 font-bold">+</div>
+                            <div class="flex items-center gap-2">
+                                <p class="text-xs font-medium text-indigo-700 w-40">PIN rightmost digit:</p>
+                                <code class="px-3 py-2 bg-green-100 border border-green-300 rounded text-green-900 font-mono font-bold"
+                                      th:text="${#strings.substring(pin.clearPin, #strings.length(pin.clearPin) - 1)}"></code>
                             </div>
                             <div class="text-center text-indigo-600 font-bold">=</div>
                             <div class="flex items-center gap-2">
-                                <p class="text-xs font-medium text-indigo-700 w-24">Combined:</p>
-                                <code class="px-3 py-2 bg-slate-100 rounded text-slate-900 font-mono font-bold text-sm" th:text="${pin.clearPin + pin.accountNumber}"></code>
+                                <p class="text-xs font-medium text-indigo-700 w-40">TSP (13 digits):</p>
+                                <code class="px-3 py-2 bg-slate-100 rounded text-slate-900 font-mono font-bold text-sm"
+                                      th:text="${#strings.substring(#strings.substring(pin.accountNumber, 0, #strings.length(pin.accountNumber) - 1), #strings.length(pin.accountNumber) - 12) + '1' + #strings.substring(pin.clearPin, #strings.length(pin.clearPin) - 1)}"></code>
                             </div>
                         </div>
                     </div>
 
                     <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 2: Apply SHA-256 Hash</p>
+                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 2: Encrypt TSP with PVK (AES-128-ECB)</p>
                         <div class="bg-white rounded-lg p-4">
-                            <p class="text-xs text-indigo-700 mb-2">Hash Function:</p>
-                            <code class="block px-3 py-2 bg-slate-100 rounded text-slate-900 font-mono text-sm">SHA-256(<span th:text="${pin.clearPin + pin.accountNumber}"></span>)</code>
-                            <p class="text-xs text-indigo-600 mt-2">↓ produces 64-character hexadecimal hash</p>
+                            <p class="text-xs text-indigo-700 mb-2">PVK derived from LMK via PBKDF2 (context: LMK:bankId:PVV)</p>
+                            <code class="block px-3 py-2 bg-slate-100 rounded text-slate-900 font-mono text-sm">AES-128-ECB(PVK, TSP zero-padded to 16 bytes)</code>
+                            <p class="text-xs text-indigo-600 mt-2">Produces 16-byte (32 hex character) ciphertext</p>
                         </div>
                     </div>
 
                     <div class="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 3: Extract First 4 Digits</p>
+                        <p class="text-sm font-medium text-indigo-900 mb-3">Step 3: Visa PVV Decimalization</p>
                         <div class="bg-white rounded-lg p-4">
-                            <p class="text-xs text-indigo-700 mb-2">Take first 4 numeric digits from hash bytes:</p>
+                            <p class="text-xs text-indigo-700 mb-2">Scan ciphertext hex left-to-right:</p>
+                            <ul class="text-xs text-indigo-700 list-disc list-inside mb-2 space-y-1">
+                                <li>Pass 1: collect digits 0-9 until 4 found</li>
+                                <li>Pass 2: map remaining A-F to 0-5 if needed</li>
+                            </ul>
                             <div class="text-center mt-3">
                                 <code class="text-4xl font-bold text-indigo-900 font-mono tracking-widest" th:text="${pin.pinVerificationValue}"></code>
                             </div>

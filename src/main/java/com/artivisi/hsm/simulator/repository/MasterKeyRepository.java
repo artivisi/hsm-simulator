@@ -23,6 +23,8 @@ public interface MasterKeyRepository extends JpaRepository<MasterKey, UUID> {
 
     List<MasterKey> findByStatusAndKeyTypeAndIdTerminal(MasterKey.KeyStatus status, KeyType keyType, UUID terminalId);
 
+    Optional<MasterKey> findFirstByStatusAndKeyTypeAndIdBankOrderByGeneratedAtDesc(MasterKey.KeyStatus status, KeyType keyType, UUID idBank);
+
     @Query("SELECT m FROM MasterKey m WHERE m.status = 'ACTIVE' ORDER BY m.generatedAt DESC")
     Optional<MasterKey> findActiveMasterKey();
 

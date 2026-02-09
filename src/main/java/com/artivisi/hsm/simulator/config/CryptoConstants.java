@@ -65,6 +65,12 @@ public final class CryptoConstants {
     /** Zone key encryption cipher (inter-bank) */
     public static final String ZONE_CIPHER = "AES/GCM/NoPadding";
 
+    /** PVV cipher (Visa PVV: single AES block, no padding) */
+    public static final String PVV_CIPHER = "AES/ECB/NoPadding";
+
+    /** Default PVKI (PIN Verification Key Indicator) for Visa PVV */
+    public static final String PVV_PVKI_DEFAULT = "1";
+
 
     // ===== GCM Parameters =====
 

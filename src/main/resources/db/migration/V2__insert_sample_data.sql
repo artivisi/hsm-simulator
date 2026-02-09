@@ -317,7 +317,7 @@ WHERE t.terminal_id = 'TRM-ISS001-ATM-001'
 -- PAN: 4111111111111111
 -- PIN: 1234
 -- PIN Block (ISO-0): 041225EEEEEEEEEE (clear), encrypted under LMK-ISS001-SAMPLE
--- PVV: 0187 (calculated using SHA-256)
+-- PVV: 0236 (Visa PVV algorithm, AES-128-ECB adaptation)
 -- Generated using: SampleDataGeneratorTest.java
 INSERT INTO generated_pins (
     account_number,
@@ -336,7 +336,7 @@ SELECT
     4,
     'ISO-0',
     '25BBDAB69938C6289C66975BF9315606D945728BF4870C7AB478898DF4E765C4',
-    '0187',
+    '0236',
     mk.id,
     '1234',
     'ACTIVE',
@@ -417,7 +417,7 @@ COMMENT ON TABLE generated_macs IS 'Sample MAC for testing MAC verification with
 --   Request body:
 --   {
 --     "pinBlockUnderTPK": "4AD5A9AB1F88975DC7F0CC1CA03FA5A9265F18718C610057B10E11906D0EC2C6",
---     "storedPVV": "0187",
+--     "storedPVV": "0236",
 --     "pan": "4111111111111111",
 --     "pinFormat": "ISO-0",
 --     "terminalId": "TRM-ISS001-ATM-001"

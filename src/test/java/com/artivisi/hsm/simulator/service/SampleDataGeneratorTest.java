@@ -10,7 +10,7 @@ import javax.crypto.Cipher;
 import javax.crypto.Mac;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
-import java.security.MessageDigest;
+import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.security.Security;
 
@@ -226,19 +226,56 @@ public class SampleDataGeneratorTest {
     }
 
     /**
-     * Generate PVV (PIN Verification Value) using SHA-256
+     * Generate PVV using Visa PVV Algorithm (AES adaptation).
+     * PVK is derived from LMK via PBKDF2 with context "LMK:{bankId}:PVV".
      */
     private String generatePVV(String pin, String pan) throws Exception {
-        String input = pin + pan;
-        MessageDigest digest = MessageDigest.getInstance(CryptoConstants.HASH_ALGORITHM);
-        byte[] hash = digest.digest(input.getBytes());
+        // Derive PVK from LMK using same context as production code
+        byte[] lmkKey = CryptoUtils.hexToBytes(LMK_HEX);
+        String bankUuid = "48a9e84c-ff57-4483-bf83-b255f34a6466";
+        String pvkContext = "LMK:" + bankUuid + ":PVV";
+        byte[] pvkKeyBytes = CryptoUtils.deriveKeyFromParent(lmkKey, pvkContext, 128);
 
-        // Take first 4 digits from hash
+        // Step 1: Build TSP (Transformed Security Parameter)
+        String panWithoutCheck = pan.substring(0, pan.length() - 1);
+        String pan11 = panWithoutCheck.substring(panWithoutCheck.length() - 11);
+        String pvki = CryptoConstants.PVV_PVKI_DEFAULT;
+        String pinRightmost = pin.substring(pin.length() - 1);
+        String tsp = pan11 + pvki + pinRightmost; // 13 decimal digits
+
+        System.out.println("  TSP components: PAN11=" + pan11 + " PVKI=" + pvki + " PINright=" + pinRightmost);
+        System.out.println("  TSP: " + tsp);
+
+        // Step 2: Encode TSP as ASCII bytes, zero-pad to 16 bytes
+        byte[] tspBytes = new byte[16];
+        byte[] asciiBytes = tsp.getBytes(StandardCharsets.US_ASCII);
+        System.arraycopy(asciiBytes, 0, tspBytes, 0, asciiBytes.length);
+
+        // Step 3: Encrypt with PVK using AES-128-ECB/NoPadding
+        SecretKeySpec pvkSpec = new SecretKeySpec(pvkKeyBytes, CryptoConstants.MASTER_KEY_ALGORITHM);
+        Cipher cipher = Cipher.getInstance(CryptoConstants.PVV_CIPHER);
+        cipher.init(Cipher.ENCRYPT_MODE, pvkSpec);
+        byte[] encrypted = cipher.doFinal(tspBytes);
+
+        // Step 4: Decimalize
+        String hexCiphertext = CryptoUtils.bytesToHex(encrypted);
+        System.out.println("  Ciphertext hex: " + hexCiphertext);
         StringBuilder pvv = new StringBuilder();
-        for (byte b : hash) {
-            int digit = Math.abs(b % 10);
-            pvv.append(digit);
-            if (pvv.length() == 4) break;
+
+        // First pass: collect decimal digits (0-9)
+        for (int i = 0; i < hexCiphertext.length() && pvv.length() < 4; i++) {
+            char c = hexCiphertext.charAt(i);
+            if (c >= '0' && c <= '9') {
+                pvv.append(c);
+            }
+        }
+
+        // Second pass: map A-F → 0-5
+        for (int i = 0; i < hexCiphertext.length() && pvv.length() < 4; i++) {
+            char c = hexCiphertext.charAt(i);
+            if (c >= 'A' && c <= 'F') {
+                pvv.append(c - 'A');
+            }
         }
 
         return pvv.toString();

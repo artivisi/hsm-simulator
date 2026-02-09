@@ -519,7 +519,7 @@ curl -X POST http://localhost:8080/api/hsm/pin/generate-pinblock \
 {
   "encryptedPinBlock": "A1B2C3D4E5F6789012345678901234AB",
   "format": "ISO-0",
-  "pvv": "5672",
+  "pvv": "0236",
   "keyId": "LMK-SAMPLE-001",
   "keyType": "LMK"
 }
@@ -585,7 +585,7 @@ curl -X POST http://localhost:8080/api/hsm/pin/verify-with-pvv \
   -u admin:admin \
   -d '{
     "pinBlockUnderTPK": "1234567890ABCDEF1234567890ABCDEF",
-    "storedPVV": "5672",
+    "storedPVV": "0236",
     "terminalId": "TRM-ISS001-ATM-001",
     "pan": "4111111111111111",
     "pinFormat": "ISO-0"
@@ -603,7 +603,7 @@ curl -X POST http://localhost:8080/api/hsm/pin/verify-with-pvv \
   "pinFormat": "ISO-0",
   "tpkKeyId": "TPK-SAMPLE-001",
   "pvkKeyId": "LMK-SAMPLE-001",
-  "storedPVV": "5672"
+  "storedPVV": "0236"
 }
 ```
 
@@ -638,7 +638,7 @@ curl -X POST http://localhost:8080/api/hsm/pin/encrypt \
 {
   "encryptedPinBlock": "8F4A2E1D9C7B5A3E6F8D2C4B7A9E5D3C",
   "format": "ISO-0",
-  "pvv": "5672"
+  "pvv": "0236"
 }
 ```
 

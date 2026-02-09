@@ -287,15 +287,15 @@ Verifies PIN using PVV (PIN Verification Value) method. This is the most common 
 3. **Core Bank → HSM**: Sends PIN block (TPK) + stored PVV + PAN
 4. **HSM Processing**:
    - Decrypts PIN block under TPK → extracts clear PIN
-   - Calculates PVV from clear PIN + PAN using SHA-256
+   - Calculates PVV from clear PIN + PAN using Visa PVV algorithm (AES-128-ECB)
    - Compares calculated PVV with stored PVV
 
-**PVV Calculation Method**:
+**PVV Calculation Method (Visa PVV, AES adaptation)**:
 ```
-Input: PIN (1234) + PAN (4111111111111111)
-Process: SHA-256(PIN + PAN)
-Extract: First 4 decimal digits from hash
-Output: PVV (e.g., "1234")
+1. Build TSP: 11 rightmost PAN digits (excl. check digit) + PVKI("1") + PIN rightmost digit
+2. Encrypt TSP (zero-padded to 16 bytes) with PVK using AES-128-ECB
+3. Decimalize ciphertext hex: scan for digits 0-9, then map A-F → 0-5, collect 4 digits
+Output: PVV (e.g., "0236")
 ```
 
 **Why PVV is Preferred**:

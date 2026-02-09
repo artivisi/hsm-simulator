@@ -170,7 +170,7 @@ Flyway automatically runs migrations on application startup.
 - **Operational Keys**: PBKDF2-SHA256 (100K iterations, context: `"KEY_TYPE:BANK_ID:IDENTIFIER"`)
 - **PIN Encryption**: AES-128-CBC (random IV prepended, PKCS5 padding)
 - **PIN Formats**: ISO-0, ISO-1, ISO-3, ISO-4 (ISO 9564-1:2002)
-- **PVV**: SHA-256(PIN + PAN), first 4 decimal digits
+- **PVV**: Visa PVV Algorithm (AES adaptation) — TSP(11 PAN digits + PVKI + PIN digit) encrypted with PVK (AES-128-ECB), decimalized to 4 digits
 - **MAC**: AES-CMAC (NIST SP 800-38B, default) or HMAC-SHA256 (64/128/256-bit output)
 - **Share Encryption**: AES-256-GCM (32-byte random salt prepended: `[salt][encrypted_share]`)
 
